@@ -239,6 +239,146 @@ class VaultStore(SecretStore):
             return []
 
 
+class DopplerStore(SecretStore):
+    """Doppler API integration.
+
+    Requires: pip install requests
+    Uses Doppler Service Token for auth.
+    """
+
+    def __init__(self, project: str = "", config: str = "", token: Optional[str] = None):
+        self.project = project or os.environ.get("DOPPLER_PROJECT", "")
+        self.config = config or os.environ.get("DOPPLER_CONFIG", "prd")
+        self.token = token or os.environ.get("DOPPLER_SERVICE_TOKEN", "")
+        self._base_url = "https://api.doppler.com/v3"
+
+    def _headers(self) -> dict:
+        return {
+            "Authorization": f"Bearer {self.token}",
+            "Accept": "application/json",
+        }
+
+    def get(self, key: str) -> Optional[str]:
+        import requests
+        url = f"{self._base_url}/configs/config/secrets"
+        params = {"project": self.project, "config": self.config}
+        resp = requests.get(url, headers=self._headers(), params=params, timeout=10)
+        if resp.status_code != 200:
+            return None
+        data = resp.json()
+        secrets = data.get("secrets", {})
+        if key in secrets:
+            return secrets[key].get("raw", "").strip() or secrets[key].get("computed", "").strip()
+        return None
+
+    def set(self, key: str, value: str) -> bool:
+        import requests
+        url = f"{self._base_url}/configs/config/secrets"
+        payload = {"project": self.project, "config": self.config,
+                    "secrets": {key: value}}
+        resp = requests.put(url, headers=self._headers(), json=payload, timeout=10)
+        return resp.status_code in (200, 201)
+
+    def delete(self, key: str) -> bool:
+        import requests
+        url = f"{self._base_url}/configs/config/secrets"
+        payload = {"project": self.project, "config": self.config,
+                    "secrets": [key]}
+        resp = requests.delete(url, headers=self._headers(), json=payload, timeout=10)
+        return resp.status_code == 204
+
+    def list_keys(self, prefix: str = "") -> list[str]:
+        import requests
+        url = f"{self._base_url}/configs/config/secrets"
+        params = {"project": self.project, "config": self.config}
+        resp = requests.get(url, headers=self._headers(), params=params, timeout=10)
+        if resp.status_code != 200:
+            return []
+        data = resp.json()
+        secrets = data.get("secrets", {})
+        keys = list(secrets.keys())
+        if prefix:
+            keys = [k for k in keys if k.startswith(prefix)]
+        return keys
+
+
+class OnePasswordStore(SecretStore):
+    """1Password Connect integration (requires 1Password Connect server).
+
+    Requires: pip install onepasswordconnectsdk
+    """
+
+    def __init__(self, url: str = "http://localhost:8080", token: Optional[str] = None,
+                 vault_id: str = "", path_prefix: str = ""):
+        self.url = url.rstrip("/")
+        self.token = token or os.environ.get("OP_CONNECT_TOKEN", "")
+        self.vault_id = vault_id or os.environ.get("OP_VAULT_ID", "")
+        self.path_prefix = path_prefix
+
+    def _headers(self) -> dict:
+        return {
+            "Authorization": f"Bearer {self.token}",
+            "Content-Type": "application/json",
+        }
+
+    def _api_get(self, path: str) -> Optional[dict]:
+        import requests
+        resp = requests.get(f"{self.url}{path}", headers=self._headers(), timeout=10)
+        if resp.status_code != 200:
+            return None
+        return resp.json()
+
+    def _api_post(self, path: str, data: dict) -> bool:
+        import requests
+        resp = requests.post(f"{self.url}{path}", headers=self._headers(), json=data, timeout=10)
+        return resp.status_code in (200, 201)
+
+    def get(self, key: str) -> Optional[str]:
+        items = self._api_get(f"/v1/vaults/{self.vault_id}/items?filter=title%20eq%20%22{key}%22")
+        if not items:
+            return None
+        item_list = items if isinstance(items, list) else items.get("items", [])
+        for item in item_list:
+            fields = item.get("fields", [])
+            for field in fields:
+                if field.get("purpose") == "PASSWORD" or field.get("label", "").lower() in ("password", "value", "credential"):
+                    return field.get("value", "")
+        return None
+
+    def set(self, key: str, value: str) -> bool:
+        payload = {
+            "title": key,
+            "category": "SECURE_NOTE",
+            "fields": [{"purpose": "PASSWORD", "label": "password", "value": value}],
+        }
+        return self._api_post(f"/v1/vaults/{self.vault_id}/items", payload)
+
+    def delete(self, key: str) -> bool:
+        import requests
+        items = self._api_get(f"/v1/vaults/{self.vault_id}/items?filter=title%20eq%20%22{key}%22")
+        if not items:
+            return False
+        item_list = items if isinstance(items, list) else items.get("items", [])
+        if not item_list:
+            return False
+        item_id = item_list[0].get("id")
+        if not item_id:
+            return False
+        resp = requests.delete(f"{self.url}/v1/vaults/{self.vault_id}/items/{item_id}",
+                                headers=self._headers(), timeout=10)
+        return resp.status_code == 204
+
+    def list_keys(self, prefix: str = "") -> list[str]:
+        items = self._api_get(f"/v1/vaults/{self.vault_id}/items")
+        if not items:
+            return []
+        item_list = items if isinstance(items, list) else items.get("items", [])
+        keys = [item.get("title", "") for item in item_list if item.get("title")]
+        if prefix:
+            keys = [k for k in keys if k.startswith(prefix)]
+        return keys
+
+
 def get_store(config) -> SecretStore:
     """Factory: create a SecretStore from config."""
     from envault.config import SecretStoreConfig
@@ -257,6 +397,15 @@ def get_store(config) -> SecretStore:
             kwargs["mount_point"] = config.path_prefix.split("/")[0] if config.path_prefix else "secret"
         elif store_type == "local":
             kwargs["env_file"] = config.path_prefix or ".env"
+        elif store_type == "doppler":
+            kwargs["project"] = config.path_prefix
+            if config.token_env_var:
+                kwargs["token"] = os.environ.get(config.token_env_var, "")
+        elif store_type == "onepassword":
+            kwargs["url"] = config.url or os.environ.get("OP_CONNECT_URL", "http://localhost:8080")
+            kwargs["vault_id"] = config.path_prefix
+            if config.token_env_var:
+                kwargs["token"] = os.environ.get(config.token_env_var, "")
         else:
             raise SecretStoreError(f"Unknown store type: {store_type}")
 
@@ -270,6 +419,8 @@ def _create_store(store_type: str, **kwargs) -> SecretStore:
         "local": LocalEnvStore,
         "aws-ssm": AwsSsmStore,
         "vault": VaultStore,
+        "doppler": DopplerStore,
+        "onepassword": OnePasswordStore,
     }
     cls = stores.get(store_type)
     if not cls:

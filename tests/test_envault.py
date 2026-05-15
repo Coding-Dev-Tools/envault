@@ -310,3 +310,145 @@ def test_audit_log_clear(tmp_path):
     assert len(log.get_history()) == 1
     log.clear()
     assert len(log.get_history()) == 0
+
+
+# ── Stores ──────────────────────────────────────────────────────────────────
+
+class TestDopplerStore:
+    """Tests for DopplerStore (mocked)."""
+
+    def test_init_defaults(self):
+        from envault.stores import DopplerStore
+        store = DopplerStore()
+        assert store.project == ""
+        assert store.config == "prd"
+
+    def test_init_with_project(self):
+        from envault.stores import DopplerStore
+        store = DopplerStore(project="myapp", config="dev")
+        assert store.project == "myapp"
+        assert store.config == "dev"
+
+    def test_get_not_found(self):
+        import responses
+        from envault.stores import DopplerStore
+        store = DopplerStore(project="test", config="dev", token="fake-token")
+        url = "https://api.doppler.com/v3/configs/config/secrets"
+        with responses.RequestsMock() as rsps:
+            rsps.get(url, status=404)
+            result = store.get("MY_KEY")
+            assert result is None
+
+    def test_list_keys_empty(self):
+        import responses
+        from envault.stores import DopplerStore
+        store = DopplerStore(project="test", config="dev", token="fake-token")
+        url = "https://api.doppler.com/v3/configs/config/secrets"
+        with responses.RequestsMock() as rsps:
+            rsps.get(url, json={"secrets": {}})
+            keys = store.list_keys()
+            assert keys == []
+
+    def test_set_and_delete(self):
+        import responses
+        from envault.stores import DopplerStore
+        store = DopplerStore(project="test", config="dev", token="fake-token")
+        base = "https://api.doppler.com/v3/configs/config/secrets"
+        with responses.RequestsMock() as rsps:
+            rsps.put(base, status=200, json={"success": True})
+            assert store.set("K", "v") is True
+            rsps.delete(base, status=204)
+            assert store.delete("K") is True
+
+
+class TestOnePasswordStore:
+    """Tests for OnePasswordStore (mocked)."""
+
+    def test_init_defaults(self):
+        from envault.stores import OnePasswordStore
+        store = OnePasswordStore()
+        assert store.url == "http://localhost:8080"
+
+    def test_get_not_found(self):
+        import responses
+        from envault.stores import OnePasswordStore
+        store = OnePasswordStore(token="fake", vault_id="vault1")
+        url = "http://localhost:8080/v1/vaults/vault1/items?filter=title%20eq%20%22K%22"
+        with responses.RequestsMock() as rsps:
+            rsps.get(url, status=404)
+            assert store.get("K") is None
+
+    def test_list_keys_empty(self):
+        import responses
+        from envault.stores import OnePasswordStore
+        store = OnePasswordStore(token="fake", vault_id="vault1")
+        url = "http://localhost:8080/v1/vaults/vault1/items"
+        with responses.RequestsMock() as rsps:
+            rsps.get(url, json={"items": []})
+            assert store.list_keys() == []
+
+
+class TestLocalEnvStore:
+    """Tests for LocalEnvStore."""
+
+    def test_get_set_delete(self, tmp_path):
+        from envault.stores import LocalEnvStore
+        env_file = tmp_path / ".env"
+        env_file.write_text("KEY=value\n")
+        store = LocalEnvStore(str(env_file))
+        assert store.get("KEY") == "value"
+        assert store.get("NONEXIST") is None
+        assert store.set("KEY", "newval") is True
+        assert store.get("KEY") == "newval"
+        assert store.delete("KEY") is True
+        assert store.get("KEY") is None
+
+    def test_list_keys(self, tmp_path):
+        from envault.stores import LocalEnvStore
+        env_file = tmp_path / ".env"
+        env_file.write_text("A=1\nB=2\n")
+        store = LocalEnvStore(str(env_file))
+        keys = store.list_keys()
+        assert "A" in keys
+        assert "B" in keys
+
+    def test_get_many(self, tmp_path):
+        from envault.stores import LocalEnvStore
+        env_file = tmp_path / ".env"
+        env_file.write_text("A=1\nB=2\nC=3\n")
+        store = LocalEnvStore(str(env_file))
+        result = store.get_many(["A", "C"])
+        assert result == {"A": "1", "C": "3"}
+
+    def test_set_many(self, tmp_path):
+        from envault.stores import LocalEnvStore
+        env_file = tmp_path / ".env"
+        env_file.write_text("A=1\n")
+        store = LocalEnvStore(str(env_file))
+        count = store.set_many({"A": "new", "B": "2"})
+        assert count == 2
+        assert store.get("A") == "new"
+        assert store.get("B") == "2"
+
+
+def test_store_factory_default():
+    from envault.stores import get_store, LocalEnvStore
+    store = get_store("some_path")
+    assert isinstance(store, LocalEnvStore)
+
+
+def test_store_factory_local_config(tmp_path):
+    from envault.config import SecretStoreConfig
+    from envault.stores import get_store, LocalEnvStore
+    config = SecretStoreConfig(type="local", path_prefix=str(tmp_path / ".env"))
+    store = get_store(config)
+    assert isinstance(store, LocalEnvStore)
+
+
+def test_store_factory_unknown():
+    from envault.config import SecretStoreConfig
+    from envault.stores import get_store, SecretStoreError
+    config = SecretStoreConfig(type="nonexistent")
+    import pytest
+    with pytest.raises(SecretStoreError):
+        get_store(config)
