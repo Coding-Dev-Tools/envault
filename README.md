@@ -1,11 +1,13 @@
 # Envault CLI
 
-**Env variable syncing, diffing, and secret rotation — with secret-store integrations.**
+**Environment variable syncing, diffing, and secret rotation — with secret-store integrations.**
 
-![Python](https://img.shields.io/badge/python-3.10%2B-blue)
-![License](https://img.shields.io/badge/license-MIT-green)
+[![PyPI](https://img.shields.io/pypi/v/envault)](https://pypi.org/project/envault/)
+[![Python](https://img.shields.io/pypi/pyversions/envault)](https://pypi.org/project/envault/)
+[![License](https://img.shields.io/pypi/l/envault)](https://github.com/Coding-Dev-Tools/envault/blob/main/LICENSE)
+[![CI](https://github.com/Coding-Dev-Tools/envault/actions/workflows/test.yml/badge.svg)](https://github.com/Coding-Dev-Tools/envault/actions/workflows/test.yml)
 
-Compare `.env` files across environments, sync variables with conflict resolution, and rotate secrets with auto-generation. Integrates with AWS SSM, HashiCorp Vault, Doppler, and 1Password.
+**Why Envault?** Every team with more than one environment has been burned by a stale `.env.prod`, a secret that was rotated last month and nobody remembers, or a deployment that broke because `STAGING_DB_URL` pointed to production. Envault gives you a single CLI to diff environments, sync with conflict resolution, rotate secrets with smart type inference, and integrate with AWS SSM, HashiCorp Vault, Doppler, and 1Password — all from your terminal.
 
 ## Quick Start
 
@@ -28,10 +30,16 @@ envault rotate DB_PASSWORD
 ## Commands
 
 ### `envault init <project>`
-Initialize a `.envault.yml` config file.
+
+Initialize a `.envault.yml` config file with sensible defaults.
+
+```bash
+envault init my-project
+```
 
 ### `envault diff <source> <target>`
-Diff environment variables between two environments. Shows keys that are:
+
+Diff environment variables between two environments or `.env` files. Shows keys that are:
 - Only in source
 - Only in target
 - Present in both but with different values
@@ -43,7 +51,8 @@ envault diff-files .env.dev .env.prod
 ```
 
 ### `envault sync <source> <target>`
-Sync environment variables from one environment to another.
+
+Sync environment variables from one environment to another with conflict resolution strategies.
 
 ```bash
 # Sync staging → prod (source values win conflicts)
@@ -63,6 +72,7 @@ envault sync staging prod --skip DB_HOST --skip DB_PORT
 ```
 
 ### `envault rotate <key>`
+
 Rotate a single environment variable with an auto-generated cryptographically secure value.
 
 ```bash
@@ -81,7 +91,7 @@ Smart rotation infers the type of secret:
 
 ### `envault store`
 
-Manage secret store integrations.
+Manage secret store integrations — read, write, and list secrets from external stores.
 
 ```bash
 envault store list
@@ -89,6 +99,64 @@ envault store list --prefix /production/
 envault store get DB_PASSWORD --store my-vault
 envault store set DB_PASSWORD new_value --store my-vault
 ```
+
+### `envault audit`
+
+View the audit log of all diff, sync, and rotate operations.
+
+```bash
+envault audit
+envault audit --key DB_PASSWORD
+envault audit --action rotate --limit 100
+```
+
+## Features
+
+- **Environment diffing** — compare variables between any two environments with colorized output
+- **Conflict resolution** — choose source-wins, target-wins, or interactive merge strategies
+- **Smart secret rotation** — auto-detects secret type (DB password, API key, JWT, webhook) and generates appropriate values
+- **Bulk rotation** — `rotate-all` with per-key dry-run preview
+- **Secret store integration** — AWS SSM, HashiCorp Vault, Doppler, 1Password
+- **Audit trail** — every operation logged to `.envault-audit.log` with queryable CLI
+- **Configuration as code** — `.envault.yml` is team-shareable and Git-friendly
+
+## Pricing
+
+Envault is one of eight tools in the Revenue Holdings suite. One license covers all CLI tools.
+
+| Plan | Price | Best For |
+|------|-------|----------|
+| **Free** | $0 | Individual devs, OSS — CLI only, rate-limited |
+| **Envault Individual** | **$12/mo** ($10 billed annually) | Professional devs — unlimited syncs, secret stores, audit |
+| **Suite (all 8 tools)** | **$49/mo** ($39 billed annually) | Full Revenue Holdings toolkit — 40% savings |
+| **Team** | **$79/mo** ($63 billed annually) | Up to 5 devs — shared configs, team dashboard, alerts |
+| **Enterprise** | Custom | SSO, RBAC, compliance reports, dedicated support |
+
+🔹 **No lock-in**: CLI works fully offline on the free tier — no telemetry, no phone-home.
+🔹 **Annual billing**: Save 20%.
+
+### Per-Tier Features
+
+| Feature | Free | Individual | Suite | Team | Enterprise |
+|---------|:----:|:----------:|:-----:|:----:|:----------:|
+| CLI: diff, sync, rotate | ✓ | ✓ | ✓ | ✓ | ✓ |
+| Conflict resolution strategies | — | ✓ | ✓ | ✓ | ✓ |
+| Smart secret type inference | — | ✓ | ✓ | ✓ | ✓ |
+| Secret store integrations | — | ✓ | ✓ | ✓ | ✓ |
+| Secret store integrations | 1 store | Unlimited | Unlimited | Unlimited | Unlimited |
+| Audit trail & query | 7 days | Unlimited | Unlimited | Unlimited | Unlimited |
+| Bulk rotate-all | — | ✓ | ✓ | ✓ | ✓ |
+| Team shared configs | — | — | — | ✓ | ✓ |
+| Dashboard & analytics | — | — | — | ✓ | ✓ |
+| Compliance reports | — | — | — | — | ✓ |
+| RBAC / SSO / SAML / OIDC | — | — | — | — | ✓ |
+| Priority support | Community | 24h | 24h | 8h | Dedicated |
+
+---
+
+<p align="center">
+  <sub>Part of <a href="https://coding-dev-tools.github.io/revenueholdings.dev/">Revenue Holdings</a> — CLI tools built by autonomous AI.</sub>
+</p>
 
 ## Configuration
 
@@ -128,29 +196,35 @@ audit_log_path: .envault-audit.log
 | Doppler | `requests` | `pip install envault[doppler]` |
 | 1Password | `onepasswordconnectsdk` | `pip install envault[onepassword]` |
 
-## Audit Trail
-
-All operations are logged to `.envault-audit.log` by default:
+## CI/CD Integration
 
 ```bash
-envault audit
-envault audit --key DB_PASSWORD
-envault audit --action rotate --limit 100
+# Block deployment if production has secrets that staging doesn't
+envault diff staging prod --fail-on-missing
+
+# Rotate a secret and sync to all environments
+envault rotate DB_PASSWORD --env staging
+envault sync staging prod
+
+# Audit before deployment
+envault audit --action rotate --limit 20
 ```
 
-## Development
+## Storage
 
-```bash
-# Install in editable mode
-pip install -e ".[dev]"
+Configuration and audit logs are stored in the project root and `~/.envault/`:
+- `.envault.yml` — project configuration (Git-friendly)
+- `.envault-audit.log` — audit trail (append-only)
 
-# Run tests
-pytest
+## Roadmap
 
-# Run tests with coverage
-pytest --cov=envault
-```
+- [ ] Interactive merge for conflict resolution
+- [ ] Vault OIDC auth
+- [ ] GitOps mode — sync from Git-based config repos
+- [ ] MCP server for AI-assisted env management
+- [ ] Docker-based CLI image
+- [ ] Terraform provider for secret provisioning
 
 ## License
 
-MIT — Revenue Holdings
+MIT — see [LICENSE](LICENSE)
