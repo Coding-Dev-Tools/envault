@@ -9,7 +9,8 @@ from typing import Optional, Sequence
 import typer
 from rich.console import Console
 from rich.table import Table
-from rich.prompt import Confirm
+
+from revenueholdings_license import require_license
 
 from envault import __version__
 from envault.audit import AuditLogger
@@ -26,6 +27,11 @@ app = typer.Typer(
 )
 console = Console()
 err_console = Console(stderr=True)
+
+
+@app.callback()
+def main_callback():
+    require_license("envault")
 
 
 def load_config(config_path: str = "") -> EnvaultConfig:
