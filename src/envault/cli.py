@@ -20,6 +20,8 @@ from envault.rotate import rotate_env_var
 from envault.sync import sync_env_files
 from envault.stores import get_store
 
+from envault.encrypt import encrypt_env, decrypt_env, is_encrypted
+
 app = typer.Typer(
     name="envault",
     help="Env variable syncing, diffing, and secret rotation CLI",
@@ -334,6 +336,38 @@ def store_set(
 
     store_instance.set(key, value)
     console.print(f"[green]✓[/green] Set {key}")
+
+
+# ── Encrypt / Decrypt ──────────────────────────────────────────────────────────
+
+@app.command()
+def encrypt(
+    input_file: Path = typer.Argument(..., help=".env file to encrypt", exists=True),
+    output: Optional[Path] = typer.Option(None, "--output", "-o", help="Output path (default: input.locked)"),
+    password: Optional[str] = typer.Option(None, "--password", "-p", help="Encryption password (prompted if omitted)"),
+    delete_original: bool = typer.Option(False, "--delete", "-d", help="Delete original after encryption"),
+):
+    """Encrypt a .env file using Fernet symmetric encryption."""
+    from envault.encrypt import encrypt_env
+    result = encrypt_env(input_file, output_path=output, password=password, delete_original=delete_original)
+    console.print(f"[green]✓[/green] Encrypted → {result}")
+    if delete_original:
+        console.print(f"[yellow]🗑 Deleted original: {input_file}[/yellow]")
+
+
+@app.command()
+def decrypt(
+    input_file: Path = typer.Argument(..., help=".env.locked file to decrypt", exists=True),
+    output: Optional[Path] = typer.Option(None, "--output", "-o", help="Output path (default: strips .locked)"),
+    password: Optional[str] = typer.Option(None, "--password", "-p", help="Decryption password (prompted if omitted)"),
+    delete_encrypted: bool = typer.Option(False, "--delete", "-d", help="Delete encrypted file after decryption"),
+):
+    """Decrypt a .env.locked file."""
+    from envault.encrypt import decrypt_env
+    result = decrypt_env(input_file, output, password, delete_encrypted)
+    console.print(f"[green]✓[/green] Decrypted → {result}")
+    if delete_encrypted:
+        console.print(f"[yellow]🗑 Deleted encrypted: {input_file}[/yellow]")
 
 
 # ── Audit ───────────────────────────────────────────────────────────────────

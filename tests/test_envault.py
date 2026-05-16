@@ -449,6 +449,107 @@ def test_store_factory_unknown():
     from envault.config import SecretStoreConfig
     from envault.stores import get_store, SecretStoreError
     config = SecretStoreConfig(type="nonexistent")
-    import pytest
     with pytest.raises(SecretStoreError):
         get_store(config)
+
+
+# ── Encrypt / Decrypt ───────────────────────────────────────────────────────
+
+
+def test_encrypt_roundtrip(tmp_path):
+    """End-to-end: encrypt a .env file, then decrypt it back."""
+    from envault.encrypt import encrypt_env, decrypt_env, is_encrypted
+
+    env_file = tmp_path / ".env"
+    env_file.write_text("SECRET=my_value\nAPI_KEY=abc123\n")
+
+    password = "test-password-123"
+
+    # Encrypt
+    encrypted = encrypt_env(env_file, password=password)
+    assert encrypted.exists()
+    assert is_encrypted(encrypted)
+    raw = encrypted.read_bytes()
+    assert raw.startswith(b"gAAAA")  # Fernet prefix
+    assert env_file.exists()  # original not deleted
+
+    # Decrypt
+    decrypted = decrypt_env(encrypted, output_path=tmp_path / ".env.restored", password=password)
+    assert decrypted.exists()
+    assert decrypted.read_text() == "SECRET=my_value\nAPI_KEY=abc123\n"
+
+
+def test_encrypt_wrong_password_fails(tmp_path):
+    """Decrypting with wrong password should fail."""
+    from envault.encrypt import encrypt_env, decrypt_env
+
+    env_file = tmp_path / ".env"
+    env_file.write_text("SECRET=value\n")
+
+    encrypted = encrypt_env(env_file, password="correct")
+    with pytest.raises(ValueError, match="Decryption failed"):
+        decrypt_env(encrypted, password="wrong")
+
+
+def test_encrypt_delete_original(tmp_path):
+    """Using --delete should remove the original file."""
+    from envault.encrypt import encrypt_env
+
+    env_file = tmp_path / ".env"
+    env_file.write_text("KEY=val\n")
+
+    encrypted = encrypt_env(env_file, password="p", delete_original=True)
+    assert encrypted.exists()
+    assert not env_file.exists()  # original deleted
+
+
+def test_encrypt_empty_file_fails(tmp_path):
+    """Encrypting an empty file should raise."""
+    from envault.encrypt import encrypt_env
+
+    env_file = tmp_path / ".env"
+    env_file.write_text("")
+
+    with pytest.raises(ValueError, match="empty"):
+        encrypt_env(env_file, password="p")
+
+
+def test_is_encrypted(tmp_path):
+    """is_encrypted detects Fernet-prefixed files."""
+    from envault.encrypt import encrypt_env, is_encrypted
+
+    env_file = tmp_path / ".env"
+    env_file.write_text("KEY=val\n")
+
+    encrypted = encrypt_env(env_file, password="p")
+    assert is_encrypted(encrypted)
+
+    # Plain text file is not encrypted
+    assert not is_encrypted(env_file)
+
+    # Non-existent file is not encrypted
+    assert not is_encrypted(tmp_path / "nonexistent")
+
+
+def test_encrypt_custom_output(tmp_path):
+    """Custom output path should be respected."""
+    from envault.encrypt import encrypt_env
+
+    env_file = tmp_path / ".env"
+    env_file.write_text("KEY=val\n")
+
+    custom = tmp_path / "custom.enc"
+    result = encrypt_env(env_file, output_path=custom, password="p")
+    assert result == custom
+    assert custom.exists()
+
+
+def test_decrypt_no_salt_fails(tmp_path):
+    """Decrypting without a salt file should fail."""
+    from envault.encrypt import decrypt_env
+
+    encrypted = tmp_path / "no_salt.locked"
+    encrypted.write_bytes(b"gAAAAfake_data_that_will_fail")
+
+    with pytest.raises(FileNotFoundError, match="Salt file"):
+        decrypt_env(encrypted, password="p")
