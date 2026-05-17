@@ -5,7 +5,6 @@ from __future__ import annotations
 import json
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Optional
 
 
 class AuditLogger:
@@ -22,7 +21,7 @@ class AuditLogger:
         source_path: str = "",
         target_path: str = "",
         env_file: str = "",
-        details: Optional[dict] = None,
+        details: dict | None = None,
     ):
         """Log an audit entry."""
         entry = {
@@ -43,7 +42,7 @@ class AuditLogger:
         with open(self.log_path, "a") as f:
             f.write(json.dumps(entry) + "\n")
 
-    def get_history(self, key: Optional[str] = None, action: Optional[str] = None, limit: int = 50) -> list[dict]:
+    def get_history(self, key: str | None = None, action: str | None = None, limit: int = 50) -> list[dict]:
         """Get audit history, optionally filtered by key and/or action."""
         path = Path(self.log_path)
         if not path.exists():

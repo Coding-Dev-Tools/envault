@@ -2,11 +2,8 @@
 
 from __future__ import annotations
 
-import os
-from pathlib import Path
-from typing import Optional
-
 import yaml
+from pathlib import Path
 from pydantic import BaseModel, Field
 
 
@@ -25,7 +22,7 @@ class EnvironmentConfig(BaseModel):
 
     name: str
     env_file: str = Field(default=".env", description="Path to .env file")
-    store: Optional[str] = Field(default=None, description="Secret store name to use")
+    store: str | None = Field(default=None, description="Secret store name to use")
     store_path: str = Field(default="", description="Path/prefix within the store")
 
 
@@ -77,7 +74,7 @@ class EnvaultConfig(BaseModel):
         """Get list of environment names."""
         return [env.name for env in self.environments]
 
-    def get_store(self, name: str) -> Optional[SecretStoreConfig]:
+    def get_store(self, name: str) -> SecretStoreConfig | None:
         return self.stores.get(name)
 
 

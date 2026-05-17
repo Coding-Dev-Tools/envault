@@ -3,10 +3,8 @@
 from __future__ import annotations
 
 import os
-from pathlib import Path
-from typing import Optional
-
 from dotenv import dotenv_values
+from pathlib import Path
 
 
 def load_env_file(path: str | Path) -> dict[str, str]:
@@ -137,7 +135,6 @@ def format_diff(
 def _mask_value(value: str, max_show: int = 8) -> str:
     """Mask sensitive values, showing only first few chars if they look like secrets."""
     # Heuristic: if it looks like a key/secret/token, mask it
-    common_secret_keys = ["key", "secret", "token", "password", "passwd", "auth", "api"]
     # Value is long and not obviously a path or number — likely a secret
     if len(value) > 16 and not value.startswith("/") and not value.replace(".", "").replace("-", "").isdigit():
         return value[:max_show] + "..." + value[-4:]

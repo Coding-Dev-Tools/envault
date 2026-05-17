@@ -44,10 +44,13 @@ jobs:
         run: |
           twine upload dist/* --verbose
 
-      - name: Publish to TestPyPI
-        if: ${{ inputs.pypi_target == 'testpypi' }}
-        env:
-          TWINE_USERNAME: __token__
-          TWINE_PASSWORD: ${{ secrets.TEST_PYPI_API_TOKEN }}
-        run: |
-          twine upload --repository testpypi dist/* --verbose
+  - name: Publish to PyPI
+    uses: pypa/gh-action-pypi-publish@release/v1
+
+  - name: Publish to TestPyPI
+    if: ${{ inputs.pypi_target == 'testpypi' }}
+    env:
+      TWINE_USERNAME: __token__
+      TWINE_PASSWORD: ${{ secrets.TEST_PYPI_API_TOKEN }}
+    run: |
+      twine upload --repository testpypi dist/* --verbose

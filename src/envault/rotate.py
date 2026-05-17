@@ -2,12 +2,10 @@
 
 from __future__ import annotations
 
-import hashlib
 import os
 import secrets
 import string
 from pathlib import Path
-from typing import Optional
 
 from .audit import AuditLogger
 
@@ -116,7 +114,7 @@ def rotate_env_var(
     *,
     length: int = 32,
     dry_run: bool = False,
-    audit: Optional[AuditLogger] = None,
+    audit: AuditLogger | None = None,
 ) -> tuple[bool, str]:
     """Rotate a single environment variable in a .env file.
 

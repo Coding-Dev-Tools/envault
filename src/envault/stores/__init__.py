@@ -5,7 +5,6 @@ from __future__ import annotations
 import os
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Optional
 
 
 class SecretStoreError(Exception):
@@ -17,7 +16,7 @@ class SecretStore(ABC):
     """Abstract base class for secret store integrations."""
 
     @abstractmethod
-    def get(self, key: str) -> Optional[str]:
+    def get(self, key: str) -> str | None:
         """Get a secret by key."""
         ...
 
@@ -59,7 +58,7 @@ class LocalEnvStore(SecretStore):
 
     def __init__(self, env_file: str | Path = ".env"):
         self.env_file = Path(env_file)
-        self._cache: Optional[dict[str, str]] = None
+        self._cache: dict[str, str] | None = None
 
     def _load(self) -> dict[str, str]:
         if self._cache is not None:
@@ -71,7 +70,7 @@ class LocalEnvStore(SecretStore):
     def _invalidate(self):
         self._cache = None
 
-    def get(self, key: str) -> Optional[str]:
+    def get(self, key: str) -> str | None:
         return self._load().get(key)
 
     def set(self, key: str, value: str) -> bool:
@@ -109,7 +108,7 @@ class AwsSsmStore(SecretStore):
     Requires: pip install boto3
     """
 
-    def __init__(self, path_prefix: str = "/", region: Optional[str] = None):
+    def __init__(self, path_prefix: str = "/", region: str | None = None):
         self.path_prefix = path_prefix.rstrip("/")
         self.region = region or os.environ.get("AWS_REGION", "us-east-1")
 
@@ -117,11 +116,11 @@ class AwsSsmStore(SecretStore):
         try:
             import boto3
         except ImportError:
-            raise SecretStoreError("boto3 not installed. Run: pip install envault[awsssm]")
+            raise SecretStoreError("boto3 not installed. Run: pip install envault[awsssm]") from None
         session = boto3.Session(region_name=self.region)
         return session.client("ssm")
 
-    def get(self, key: str) -> Optional[str]:
+    def get(self, key: str) -> str | None:
         client = self._get_client()
         param_path = f"{self.path_prefix}/{key}"
         try:
@@ -173,7 +172,7 @@ class VaultStore(SecretStore):
     Requires: pip install hvac
     """
 
-    def __init__(self, url: str = "http://127.0.0.1:8200", token: Optional[str] = None,
+    def __init__(self, url: str = "http://127.0.0.1:8200", token: str | None = None,
                  mount_point: str = "secret", path_prefix: str = ""):
         self.url = url
         self.token = token or os.environ.get("VAULT_TOKEN", "")
@@ -184,7 +183,7 @@ class VaultStore(SecretStore):
         try:
             import hvac
         except ImportError:
-            raise SecretStoreError("hvac not installed. Run: pip install envault[vault]")
+            raise SecretStoreError("hvac not installed. Run: pip install envault[vault]") from None
         client = hvac.Client(url=self.url, token=self.token)
         if not client.is_authenticated():
             raise SecretStoreError("Vault authentication failed")
@@ -194,7 +193,7 @@ class VaultStore(SecretStore):
         parts = [p for p in [self.path_prefix, key] if p]
         return "/".join(parts)
 
-    def get(self, key: str) -> Optional[str]:
+    def get(self, key: str) -> str | None:
         client = self._get_client()
         try:
             response = client.secrets.kv.v2.read_secret(
@@ -246,7 +245,7 @@ class DopplerStore(SecretStore):
     Uses Doppler Service Token for auth.
     """
 
-    def __init__(self, project: str = "", config: str = "", token: Optional[str] = None):
+    def __init__(self, project: str = "", config: str = "", token: str | None = None):
         self.project = project or os.environ.get("DOPPLER_PROJECT", "")
         self.config = config or os.environ.get("DOPPLER_CONFIG", "prd")
         self.token = token or os.environ.get("DOPPLER_SERVICE_TOKEN", "")
@@ -258,7 +257,7 @@ class DopplerStore(SecretStore):
             "Accept": "application/json",
         }
 
-    def get(self, key: str) -> Optional[str]:
+    def get(self, key: str) -> str | None:
         import requests
         url = f"{self._base_url}/configs/config/secrets"
         params = {"project": self.project, "config": self.config}
@@ -308,7 +307,7 @@ class OnePasswordStore(SecretStore):
     Requires: pip install onepasswordconnectsdk
     """
 
-    def __init__(self, url: str = "http://localhost:8080", token: Optional[str] = None,
+    def __init__(self, url: str = "http://localhost:8080", token: str | None = None,
                  vault_id: str = "", path_prefix: str = ""):
         self.url = url.rstrip("/")
         self.token = token or os.environ.get("OP_CONNECT_TOKEN", "")
@@ -321,7 +320,7 @@ class OnePasswordStore(SecretStore):
             "Content-Type": "application/json",
         }
 
-    def _api_get(self, path: str) -> Optional[dict]:
+    def _api_get(self, path: str) -> dict | None:
         import requests
         resp = requests.get(f"{self.url}{path}", headers=self._headers(), timeout=10)
         if resp.status_code != 200:
@@ -333,7 +332,7 @@ class OnePasswordStore(SecretStore):
         resp = requests.post(f"{self.url}{path}", headers=self._headers(), json=data, timeout=10)
         return resp.status_code in (200, 201)
 
-    def get(self, key: str) -> Optional[str]:
+    def get(self, key: str) -> str | None:
         items = self._api_get(f"/v1/vaults/{self.vault_id}/items?filter=title%20eq%20%22{key}%22")
         if not items:
             return None

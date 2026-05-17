@@ -3,10 +3,9 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Optional
 
-from .diff import diff_envs, load_env_file
 from .audit import AuditLogger
+from .diff import load_env_file
 
 
 class SyncConflict(Exception):
@@ -53,7 +52,7 @@ def sync_envs(
     *,
     strategy: str = "source_wins",
     allow_delete: bool = False,
-    skip_keys: Optional[set[str]] = None,
+    skip_keys: set[str] | None = None,
 ) -> SyncResult:
     """Sync environment variables from source to target.
 
@@ -140,8 +139,8 @@ def sync_env_files(
     *,
     strategy: str = "source_wins",
     allow_delete: bool = False,
-    skip_keys: Optional[set[str]] = None,
-    audit: Optional[AuditLogger] = None,
+    skip_keys: set[str] | None = None,
+    audit: AuditLogger | None = None,
 ) -> SyncResult:
     """Sync environment variables from one .env file to another.
 
@@ -167,7 +166,7 @@ def sync_env_files(
     )
 
     if result.success_count > 0 or result.deleted:
-        written = write_env_file(target_path, target)
+        write_env_file(target_path, target)
         if audit:
             for k in result.added:
                 audit.log("add", k, source_path=str(source_path), target_path=str(target_path))

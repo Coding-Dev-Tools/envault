@@ -1,23 +1,28 @@
-"""Main CLI entrypoint for Envault."""
+﻿"""Main CLI entrypoint for Envault."""
 
 from __future__ import annotations
 
-import sys
-from pathlib import Path
-from typing import Optional, Sequence
-
 import typer
+from pathlib import Path
 from rich.console import Console
-from rich.table import Table
 from rich.prompt import Confirm
+from rich.table import Table
+
+try:
+    from revenueholdings_license import require_license
+except ImportError:
+    def require_license(tool):
+        def decorator(func):
+            return func
+        return decorator
 
 from envault import __version__
 from envault.audit import AuditLogger
 from envault.config import EnvaultConfig, init_config
-from envault.diff import diff_env_files, diff_envs, format_diff
+from envault.diff import diff_env_files, format_diff
 from envault.rotate import rotate_env_var
-from envault.sync import sync_env_files
 from envault.stores import get_store
+from envault.sync import sync_env_files
 
 app = typer.Typer(
     name="envault",
@@ -34,7 +39,7 @@ def load_config(config_path: str = "") -> EnvaultConfig:
     return EnvaultConfig.load(path)
 
 
-# ── Init ────────────────────────────────────────────────────────────────────
+# â”€â”€ Init â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 @app.command()
 def init(
@@ -43,19 +48,19 @@ def init(
 ):
     """Initialize a new .envault.yml config file."""
     init_config(project_name, config_path)
-    console.print(f"[green]✓[/green] Created {config_path} for project '{project_name}'")
+    console.print(f"[green]âœ“[/green] Created {config_path} for project '{project_name}'")
     console.print("\nEdit the file to configure environments and secret stores.")
     console.print("Then run: envault diff, envault sync, envault rotate")
 
 
-# ── Diff ────────────────────────────────────────────────────────────────────
+# â”€â”€ Diff â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 @app.command()
 def diff(
     source_env: str = typer.Argument("dev", help="Source environment"),
     target_env: str = typer.Argument("prod", help="Target environment"),
-    source_file: Optional[str] = typer.Option(None, "--source", "-s", help="Source .env file path (overrides env name)"),
-    target_file: Optional[str] = typer.Option(None, "--target", "-t", help="Target .env file path (overrides env name)"),
+    source_file: str | None = typer.Option(None, "--source", "-s", help="Source .env file path (overrides env name)"),
+    target_file: str | None = typer.Option(None, "--target", "-t", help="Target .env file path (overrides env name)"),
     config_path: str = typer.Option("", "--config", "-c", help="Config file path"),
 ):
     """Diff environment variables between two environments or .env files."""
@@ -90,7 +95,7 @@ def diff_files(
     raise typer.Exit(0)
 
 
-# ── Sync ────────────────────────────────────────────────────────────────────
+# â”€â”€ Sync â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 @app.command()
 def sync(
@@ -99,7 +104,7 @@ def sync(
     strategy: str = typer.Option("source_wins", "--strategy", "-s",
                                   help="Conflict resolution: source_wins, target_wins, error"),
     allow_delete: bool = typer.Option(False, "--allow-delete", "-d", help="Delete keys not in source"),
-    skip: Optional[list[str]] = typer.Option(None, "--skip", help="Keys to skip"),
+    skip: list[str] | None = typer.Option(None, "--skip", help="Keys to skip"),  # noqa: B008
     dry_run: bool = typer.Option(False, "--dry-run", "-n", help="Show changes without applying"),
     config_path: str = typer.Option("", "--config", "-c", help="Config file path"),
 ):
@@ -127,7 +132,7 @@ def sync(
         from envault.sync import sync_envs
         result = sync_envs(source_vars, target_vars, strategy=strategy,
                            allow_delete=allow_delete, skip_keys=skip_keys)
-        console.print(f"[yellow]Dry run[/yellow] — would sync {source_env} → {target_env}:")
+        console.print(f"[yellow]Dry run[/yellow] â€” would sync {source_env} â†’ {target_env}:")
         console.print(f"  + {len(result.added)} keys to add")
         console.print(f"  ~ {len(result.updated)} keys to update")
         console.print(f"  - {len(result.deleted)} keys to delete")
@@ -151,9 +156,9 @@ def sync(
         raise typer.Exit(1)
 
     if result.success_count == 0 and not result.deleted:
-        console.print(f"[green]✓[/green] {source_env} and {target_env} are already in sync")
+        console.print(f"[green]âœ“[/green] {source_env} and {target_env} are already in sync")
     else:
-        console.print(f"[green]✓[/green] Synced {source_env} → {target_env}:")
+        console.print(f"[green]âœ“[/green] Synced {source_env} â†’ {target_env}:")
         if result.added:
             console.print(f"  + Added: {', '.join(result.added[:10])}" +
                          (f" +{len(result.added) - 10}" if len(result.added) > 10 else ""))
@@ -167,7 +172,7 @@ def sync(
                          (f" +{len(result.skipped) - 10}" if len(result.skipped) > 10 else ""))
 
 
-# ── Rotate ──────────────────────────────────────────────────────────────────
+# â”€â”€ Rotate â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 @app.command()
 def rotate(
@@ -201,11 +206,11 @@ def rotate(
 
     if dry_run:
         if output:
-            console.print(f"[yellow]Would rotate[/yellow] {key} → {new_value}")
+            console.print(f"[yellow]Would rotate[/yellow] {key} â†’ {new_value}")
         else:
             console.print(f"[yellow]Would rotate[/yellow] {key} (use --show to display)")
     else:
-        console.print(f"[green]✓[/green] Rotated {key} in {env}")
+        console.print(f"[green]âœ“[/green] Rotated {key} in {env}")
         if output:
             console.print(f"  New value: {new_value}")
 
@@ -252,10 +257,10 @@ def rotate_all(
     if dry_run:
         console.print(f"[yellow]Dry run:[/yellow] Would rotate {rotated} variables in {env}")
     else:
-        console.print(f"[green]✓[/green] Rotated {rotated} variables in {env}")
+        console.print(f"[green]âœ“[/green] Rotated {rotated} variables in {env}")
 
 
-# ── Store Commands ──────────────────────────────────────────────────────────
+# â”€â”€ Store Commands â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 store_app = typer.Typer(name="store", help="Manage secret store integrations.")
 app.add_typer(store_app)
@@ -263,7 +268,7 @@ app.add_typer(store_app)
 
 @store_app.command("list")
 def store_list(
-    store_name: Optional[str] = typer.Argument(None, help="Store name from config"),
+    store_name: str | None = typer.Argument(None, help="Store name from config"),
     prefix: str = typer.Option("", "--prefix", "-p", help="Filter keys by prefix"),
     config_path: str = typer.Option("", "--config", "-c", help="Config file path"),
 ):
@@ -292,7 +297,7 @@ def store_list(
 @store_app.command("get")
 def store_get(
     key: str = typer.Argument(..., help="Key to retrieve"),
-    store_name: Optional[str] = typer.Option(None, "--store", "-s", help="Store name from config"),
+    store_name: str | None = typer.Option(None, "--store", "-s", help="Store name from config"),
     config_path: str = typer.Option("", "--config", "-c", help="Config file path"),
 ):
     """Get a value from a secret store."""
@@ -315,7 +320,7 @@ def store_get(
 def store_set(
     key: str = typer.Argument(..., help="Key to set"),
     value: str = typer.Argument(..., help="Value to store"),
-    store_name: Optional[str] = typer.Option(None, "--store", "-s", help="Store name from config"),
+    store_name: str | None = typer.Option(None, "--store", "-s", help="Store name from config"),
     config_path: str = typer.Option("", "--config", "-c", help="Config file path"),
 ):
     """Set a value in a secret store."""
@@ -327,15 +332,15 @@ def store_set(
         store_instance = get_store(config_path)
 
     store_instance.set(key, value)
-    console.print(f"[green]✓[/green] Set {key}")
+    console.print(f"[green]âœ“[/green] Set {key}")
 
 
-# ── Audit ───────────────────────────────────────────────────────────────────
+# â”€â”€ Audit â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 @app.command()
 def audit(
-    key: Optional[str] = typer.Option(None, "--key", "-k", help="Filter by key"),
-    action: Optional[str] = typer.Option(None, "--action", "-a", help="Filter by action (add/update/delete/rotate)"),
+    key: str | None = typer.Option(None, "--key", "-k", help="Filter by key"),
+    action: str | None = typer.Option(None, "--action", "-a", help="Filter by action (add/update/delete/rotate)"),
     limit: int = typer.Option(50, "--limit", "-n", help="Number of entries to show"),
     config_path: str = typer.Option("", "--config", "-c", help="Config file path"),
 ):
@@ -366,7 +371,7 @@ def audit(
     console.print(table)
 
 
-# ── Version ─────────────────────────────────────────────────────────────────
+# â”€â”€ Version â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 @app.command()
 def version():
@@ -376,3 +381,4 @@ def version():
 
 if __name__ == "__main__":
     app()
+
