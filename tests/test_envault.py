@@ -1,19 +1,13 @@
 """Tests for Envault CLI."""
 
-import json
-import os
-import tempfile
-from pathlib import Path
-
 import pytest
-
 from envault import __version__
 from envault.audit import AuditLogger
 from envault.config import EnvaultConfig, init_config
-from envault.diff import diff_envs, diff_env_files, format_diff, load_env_file
-from envault.rotate import generate_secret, rotate_value, rotate_env_var
-from envault.sync import sync_envs, sync_env_files, SyncConflict, write_env_file
-
+from envault.diff import diff_env_files, diff_envs, format_diff, load_env_file
+from envault.rotate import generate_secret, rotate_env_var, rotate_value
+from envault.sync import SyncConflict, sync_env_files, sync_envs, write_env_file
+from pathlib import Path
 
 # ── Version ─────────────────────────────────────────────────────────────────
 
@@ -230,7 +224,10 @@ def test_generate_secret_no_symbols():
 
 
 def test_generate_secret_exclude():
-    secret = generate_secret(100, use_upper=True, use_lower=True, use_digits=True, use_symbols=False, exclude_chars="abc")
+    secret = generate_secret(
+        100, use_upper=True, use_lower=True,
+        use_digits=True, use_symbols=False, exclude_chars="abc",
+    )
     assert "a" not in secret
     assert "b" not in secret
     assert "c" not in secret
@@ -432,14 +429,14 @@ class TestLocalEnvStore:
 
 
 def test_store_factory_default():
-    from envault.stores import get_store, LocalEnvStore
+    from envault.stores import LocalEnvStore, get_store
     store = get_store("some_path")
     assert isinstance(store, LocalEnvStore)
 
 
 def test_store_factory_local_config(tmp_path):
     from envault.config import SecretStoreConfig
-    from envault.stores import get_store, LocalEnvStore
+    from envault.stores import LocalEnvStore, get_store
     config = SecretStoreConfig(type="local", path_prefix=str(tmp_path / ".env"))
     store = get_store(config)
     assert isinstance(store, LocalEnvStore)
@@ -447,7 +444,7 @@ def test_store_factory_local_config(tmp_path):
 
 def test_store_factory_unknown():
     from envault.config import SecretStoreConfig
-    from envault.stores import get_store, SecretStoreError
+    from envault.stores import SecretStoreError, get_store
     config = SecretStoreConfig(type="nonexistent")
     import pytest
     with pytest.raises(SecretStoreError):

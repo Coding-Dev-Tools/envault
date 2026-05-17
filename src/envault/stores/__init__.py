@@ -340,7 +340,10 @@ class OnePasswordStore(SecretStore):
         for item in item_list:
             fields = item.get("fields", [])
             for field in fields:
-                if field.get("purpose") == "PASSWORD" or field.get("label", "").lower() in ("password", "value", "credential"):
+                if (
+            field.get("purpose") == "PASSWORD"
+            or field.get("label", "").lower() in ("password", "value", "credential")
+        ):
                     return field.get("value", "")
         return None
 
