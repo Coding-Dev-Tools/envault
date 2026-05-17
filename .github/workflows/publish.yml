@@ -7,7 +7,7 @@ on:
     inputs:
       pypi_target:
         description: 'PyPI target (pypi or testpypi)'
-        default: 'testpypi'
+        default: 'pypi'
         type: choice
         options:
           - pypi
@@ -30,27 +30,18 @@ jobs:
 
       - name: Install build deps
         run: |
-          pip install build twine
+          pip install build
 
       - name: Build package
         run: |
           python -m build
 
+      - name: Publish to TestPyPI
+        if: ${{ inputs.pypi_target == 'testpypi' }}
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+
       - name: Publish to PyPI
-        if: ${{ inputs.pypi_target != 'testpypi' || github.event_name == 'release' }}
-        env:
-          TWINE_USERNAME: __token__
-          TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
-        run: |
-          twine upload dist/* --verbose
-
-  - name: Publish to PyPI
-    uses: pypa/gh-action-pypi-publish@release/v1
-
-  - name: Publish to TestPyPI
-    if: ${{ inputs.pypi_target == 'testpypi' }}
-    env:
-      TWINE_USERNAME: __token__
-      TWINE_PASSWORD: ${{ secrets.TEST_PYPI_API_TOKEN }}
-    run: |
-      twine upload --repository testpypi dist/* --verbose
+        if: ${{ inputs.pypi_target == 'pypi' || github.event_name == 'release' }}
+        uses: pypa/gh-action-pypi-publish@release/v1
