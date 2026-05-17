@@ -7,7 +7,9 @@
 [![License](https://img.shields.io/pypi/l/rh-envault)](https://github.com/Coding-Dev-Tools/envault/blob/main/LICENSE)
 [![CI](https://github.com/Coding-Dev-Tools/envault/actions/workflows/ci.yml/badge.svg)](https://github.com/Coding-Dev-Tools/envault/actions/workflows/ci.yml)
 
-**Why Envault?** Every team with more than one environment has been burned by a stale `.env.prod`, a secret that was rotated last month and nobody remembers, or a deployment that broke because `STAGING_DB_URL` pointed to production. Envault gives you a single CLI to diff environments, sync with conflict resolution, rotate secrets with smart type inference, and integrate with AWS SSM, HashiCorp Vault, Doppler, and 1Password — all from your terminal.
+> ⭐ **Star this repo** if you manage environment variables — it helps other developers find Envault!
+
+**Why Envault?**
 
 ## Quick Start
 
