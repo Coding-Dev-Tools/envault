@@ -10,7 +10,13 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
-from revenueholdings_license import require_license
+try:
+    from revenueholdings_license import require_license
+except ImportError:
+    import warnings
+    warnings.warn("revenueholdings-license not installed; license checks skipped", stacklevel=2)
+    def require_license(product: str) -> None:  # type: ignore[misc]
+        pass
 
 from envault import __version__
 from envault.audit import AuditLogger
