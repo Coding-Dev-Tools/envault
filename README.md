@@ -16,7 +16,21 @@
 
 ```bash
 pip install envault
+```
 
+Or install via Homebrew (macOS/Linux):
+```bash
+brew tap Coding-Dev-Tools/tap
+brew install envault
+```
+
+Or install via Scoop (Windows):
+```bash
+scoop bucket add Coding-Dev-Tools https://github.com/Coding-Dev-Tools/scoop-bucket
+scoop install envault
+```
+
+```bash
 # Initialize a project
 envault init my-project
 
