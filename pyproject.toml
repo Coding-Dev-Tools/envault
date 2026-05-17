@@ -41,13 +41,13 @@ Documentation = "https://github.com/Coding-Dev-Tools/envault#readme"
 
 [project.optional-dependencies]
 vault = ["hvac>=2.0.0"]
-awsssm = ["boto3>=1.28.0"]
+awsssm = ["boto3>=1.43.9"]
 doppler = ["requests>=2.31.0"]
 onepassword = ["onepasswordconnectsdk>=1.1.0"]
 dev = ["pytest>=7.0", "pytest-cov", "responses>=0.24.0"]
 all = [
     "hvac>=2.0.0",
-    "boto3>=1.28.0",
+    "boto3>=1.43.9",
     "requests>=2.31.0",
     "onepasswordconnectsdk>=1.1.0",
 ]
