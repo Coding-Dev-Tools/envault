@@ -1,19 +1,13 @@
 """Tests for Envault CLI."""
 
-import json
-import os
-import tempfile
-from pathlib import Path
-
 import pytest
-
 from envault import __version__
 from envault.audit import AuditLogger
 from envault.config import EnvaultConfig, init_config
-from envault.diff import diff_envs, diff_env_files, format_diff, load_env_file
-from envault.rotate import generate_secret, rotate_value, rotate_env_var
-from envault.sync import sync_envs, sync_env_files, SyncConflict, write_env_file
-
+from envault.diff import diff_env_files, diff_envs, format_diff, load_env_file
+from envault.rotate import generate_secret, rotate_env_var, rotate_value
+from envault.sync import SyncConflict, sync_env_files, sync_envs, write_env_file
+from pathlib import Path
 
 # ── Version ─────────────────────────────────────────────────────────────────
 
@@ -432,14 +426,14 @@ class TestLocalEnvStore:
 
 
 def test_store_factory_default():
-    from envault.stores import get_store, LocalEnvStore
+    from envault.stores import LocalEnvStore, get_store
     store = get_store("some_path")
     assert isinstance(store, LocalEnvStore)
 
 
 def test_store_factory_local_config(tmp_path):
     from envault.config import SecretStoreConfig
-    from envault.stores import get_store, LocalEnvStore
+    from envault.stores import LocalEnvStore, get_store
     config = SecretStoreConfig(type="local", path_prefix=str(tmp_path / ".env"))
     store = get_store(config)
     assert isinstance(store, LocalEnvStore)
@@ -447,7 +441,7 @@ def test_store_factory_local_config(tmp_path):
 
 def test_store_factory_unknown():
     from envault.config import SecretStoreConfig
-    from envault.stores import get_store, SecretStoreError
+    from envault.stores import SecretStoreError, get_store
     config = SecretStoreConfig(type="nonexistent")
     with pytest.raises(SecretStoreError):
         get_store(config)
@@ -458,7 +452,7 @@ def test_store_factory_unknown():
 
 def test_encrypt_roundtrip(tmp_path):
     """End-to-end: encrypt a .env file, then decrypt it back."""
-    from envault.encrypt import encrypt_env, decrypt_env, is_encrypted
+    from envault.encrypt import decrypt_env, encrypt_env, is_encrypted
 
     env_file = tmp_path / ".env"
     env_file.write_text("SECRET=my_value\nAPI_KEY=abc123\n")
@@ -481,7 +475,7 @@ def test_encrypt_roundtrip(tmp_path):
 
 def test_encrypt_wrong_password_fails(tmp_path):
     """Decrypting with wrong password should fail."""
-    from envault.encrypt import encrypt_env, decrypt_env
+    from envault.encrypt import decrypt_env, encrypt_env
 
     env_file = tmp_path / ".env"
     env_file.write_text("SECRET=value\n")

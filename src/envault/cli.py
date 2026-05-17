@@ -2,12 +2,10 @@
 
 from __future__ import annotations
 
-import sys
-from pathlib import Path
-from typing import Optional, Sequence
-
 import typer
+from pathlib import Path
 from rich.console import Console
+from rich.prompt import Confirm
 from rich.table import Table
 
 try:
@@ -21,12 +19,11 @@ except ImportError:
 from envault import __version__
 from envault.audit import AuditLogger
 from envault.config import EnvaultConfig, init_config
-from envault.diff import diff_env_files, diff_envs, format_diff
+from envault.diff import diff_env_files, format_diff
+from envault.encrypt import decrypt_env, encrypt_env
 from envault.rotate import rotate_env_var
-from envault.sync import sync_env_files
 from envault.stores import get_store
-
-from envault.encrypt import encrypt_env, decrypt_env, is_encrypted
+from envault.sync import sync_env_files
 
 app = typer.Typer(
     name="envault",
@@ -68,8 +65,8 @@ def init(
 def diff(
     source_env: str = typer.Argument("dev", help="Source environment"),
     target_env: str = typer.Argument("prod", help="Target environment"),
-    source_file: Optional[str] = typer.Option(None, "--source", "-s", help="Source .env file path (overrides env name)"),
-    target_file: Optional[str] = typer.Option(None, "--target", "-t", help="Target .env file path (overrides env name)"),
+    source_file: str | None = typer.Option(None, "--source", "-s", help="Source .env file path (overrides env name)"),
+    target_file: str | None = typer.Option(None, "--target", "-t", help="Target .env file path (overrides env name)"),
     config_path: str = typer.Option("", "--config", "-c", help="Config file path"),
 ):
     """Diff environment variables between two environments or .env files."""
@@ -113,7 +110,7 @@ def sync(
     strategy: str = typer.Option("source_wins", "--strategy", "-s",
                                   help="Conflict resolution: source_wins, target_wins, error"),
     allow_delete: bool = typer.Option(False, "--allow-delete", "-d", help="Delete keys not in source"),
-    skip: Optional[list[str]] = typer.Option(None, "--skip", help="Keys to skip"),
+    skip: list[str] | None = typer.Option(None, "--skip", help="Keys to skip"),
     dry_run: bool = typer.Option(False, "--dry-run", "-n", help="Show changes without applying"),
     config_path: str = typer.Option("", "--config", "-c", help="Config file path"),
 ):
@@ -277,7 +274,7 @@ app.add_typer(store_app)
 
 @store_app.command("list")
 def store_list(
-    store_name: Optional[str] = typer.Argument(None, help="Store name from config"),
+    store_name: str | None = typer.Argument(None, help="Store name from config"),
     prefix: str = typer.Option("", "--prefix", "-p", help="Filter keys by prefix"),
     config_path: str = typer.Option("", "--config", "-c", help="Config file path"),
 ):
@@ -306,7 +303,7 @@ def store_list(
 @store_app.command("get")
 def store_get(
     key: str = typer.Argument(..., help="Key to retrieve"),
-    store_name: Optional[str] = typer.Option(None, "--store", "-s", help="Store name from config"),
+    store_name: str | None = typer.Option(None, "--store", "-s", help="Store name from config"),
     config_path: str = typer.Option("", "--config", "-c", help="Config file path"),
 ):
     """Get a value from a secret store."""
@@ -329,7 +326,7 @@ def store_get(
 def store_set(
     key: str = typer.Argument(..., help="Key to set"),
     value: str = typer.Argument(..., help="Value to store"),
-    store_name: Optional[str] = typer.Option(None, "--store", "-s", help="Store name from config"),
+    store_name: str | None = typer.Option(None, "--store", "-s", help="Store name from config"),
     config_path: str = typer.Option("", "--config", "-c", help="Config file path"),
 ):
     """Set a value in a secret store."""
@@ -349,12 +346,11 @@ def store_set(
 @app.command()
 def encrypt(
     input_file: Path = typer.Argument(..., help=".env file to encrypt", exists=True),
-    output: Optional[Path] = typer.Option(None, "--output", "-o", help="Output path (default: input.locked)"),
-    password: Optional[str] = typer.Option(None, "--password", "-p", help="Encryption password (prompted if omitted)"),
+    output: Path | None = typer.Option(None, "--output", "-o", help="Output path (default: input.locked)"),
+    password: str | None = typer.Option(None, "--password", "-p", help="Encryption password (prompted if omitted)"),
     delete_original: bool = typer.Option(False, "--delete", "-d", help="Delete original after encryption"),
 ):
     """Encrypt a .env file using Fernet symmetric encryption."""
-    from envault.encrypt import encrypt_env
     result = encrypt_env(input_file, output_path=output, password=password, delete_original=delete_original)
     console.print(f"[green]✓[/green] Encrypted → {result}")
     if delete_original:
@@ -364,12 +360,11 @@ def encrypt(
 @app.command()
 def decrypt(
     input_file: Path = typer.Argument(..., help=".env.locked file to decrypt", exists=True),
-    output: Optional[Path] = typer.Option(None, "--output", "-o", help="Output path (default: strips .locked)"),
-    password: Optional[str] = typer.Option(None, "--password", "-p", help="Decryption password (prompted if omitted)"),
+    output: Path | None = typer.Option(None, "--output", "-o", help="Output path (default: strips .locked)"),
+    password: str | None = typer.Option(None, "--password", "-p", help="Decryption password (prompted if omitted)"),
     delete_encrypted: bool = typer.Option(False, "--delete", "-d", help="Delete encrypted file after decryption"),
 ):
     """Decrypt a .env.locked file."""
-    from envault.encrypt import decrypt_env
     result = decrypt_env(input_file, output, password, delete_encrypted)
     console.print(f"[green]✓[/green] Decrypted → {result}")
     if delete_encrypted:
@@ -380,8 +375,8 @@ def decrypt(
 
 @app.command()
 def audit(
-    key: Optional[str] = typer.Option(None, "--key", "-k", help="Filter by key"),
-    action: Optional[str] = typer.Option(None, "--action", "-a", help="Filter by action (add/update/delete/rotate)"),
+    key: str | None = typer.Option(None, "--key", "-k", help="Filter by key"),
+    action: str | None = typer.Option(None, "--action", "-a", help="Filter by action (add/update/delete/rotate)"),
     limit: int = typer.Option(50, "--limit", "-n", help="Number of entries to show"),
     config_path: str = typer.Option("", "--config", "-c", help="Config file path"),
 ):

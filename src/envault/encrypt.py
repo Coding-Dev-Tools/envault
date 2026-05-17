@@ -12,15 +12,11 @@ from __future__ import annotations
 
 import base64
 import getpass
-import hashlib
 import os
-import sys
-from pathlib import Path
-from typing import Optional
-
 from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+from pathlib import Path
 
 # ── Constants ────────────────────────────────────────────────────────────────
 
@@ -69,8 +65,8 @@ def _get_password(prompt: str = "Encryption password: ") -> str:
 
 def encrypt_env(
     input_path: Path,
-    output_path: Optional[Path] = None,
-    password: Optional[str] = None,
+    output_path: Path | None = None,
+    password: str | None = None,
     delete_original: bool = False,
 ) -> Path:
     """Encrypt a .env file.
@@ -111,8 +107,8 @@ def encrypt_env(
 
 def decrypt_env(
     input_path: Path,
-    output_path: Optional[Path] = None,
-    password: Optional[str] = None,
+    output_path: Path | None = None,
+    password: str | None = None,
     delete_encrypted: bool = False,
 ) -> Path:
     """Decrypt a .env.locked file.
