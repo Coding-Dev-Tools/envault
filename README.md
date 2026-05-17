@@ -5,7 +5,7 @@
 [![PyPI](https://img.shields.io/pypi/v/rh-envault)](https://pypi.org/project/rh-envault/)
 [![Python](https://img.shields.io/pypi/pyversions/rh-envault)](https://pypi.org/project/rh-envault/)
 [![License](https://img.shields.io/pypi/l/rh-envault)](https://github.com/Coding-Dev-Tools/envault/blob/main/LICENSE)
-[![CI](https://github.com/Coding-Dev-Tools/envault/actions/workflows/test.yml/badge.svg)](https://github.com/Coding-Dev-Tools/envault/actions/workflows/test.yml)
+[![CI](https://github.com/Coding-Dev-Tools/envault/actions/workflows/ci.yml/badge.svg)](https://github.com/Coding-Dev-Tools/envault/actions/workflows/ci.yml)
 
 **Why Envault?** Every team with more than one environment has been burned by a stale `.env.prod`, a secret that was rotated last month and nobody remembers, or a deployment that broke because `STAGING_DB_URL` pointed to production. Envault gives you a single CLI to diff environments, sync with conflict resolution, rotate secrets with smart type inference, and integrate with AWS SSM, HashiCorp Vault, Doppler, and 1Password — all from your terminal.
 
@@ -15,29 +15,29 @@
 pip install rh-envault
 
 # Initialize a project
-envault init my-project
+rh-envault init my-project
 
 # Diff environments
-envault diff dev prod
+rh-envault diff dev prod
 
 # Sync staging → prod
-envault sync staging prod
+rh-envault sync staging prod
 
 # Rotate a secret
-envault rotate DB_PASSWORD
+rh-envault rotate DB_PASSWORD
 ```
 
 ## Commands
 
-### `envault init <project>`
+### `rh-envault init <project>`
 
 Initialize a `.envault.yml` config file with sensible defaults.
 
 ```bash
-envault init my-project
+rh-envault init my-project
 ```
 
-### `envault diff <source> <target>`
+### `rh-envault diff <source> <target>`
 
 Diff environment variables between two environments or `.env` files. Shows keys that are:
 - Only in source
@@ -45,41 +45,41 @@ Diff environment variables between two environments or `.env` files. Shows keys 
 - Present in both but with different values
 
 ```bash
-envault diff dev staging
-envault diff prod staging
-envault diff-files .env.dev .env.prod
+rh-envault diff dev staging
+rh-envault diff prod staging
+rh-envault diff-files .env.dev .env.prod
 ```
 
-### `envault sync <source> <target>`
+### `rh-envault sync <source> <target>`
 
 Sync environment variables from one environment to another with conflict resolution strategies.
 
 ```bash
 # Sync staging → prod (source values win conflicts)
-envault sync staging prod
+rh-envault sync staging prod
 
 # Dry run first
-envault sync staging prod --dry-run
+rh-envault sync staging prod --dry-run
 
 # Keep target values on conflict
-envault sync staging prod --strategy target_wins
+rh-envault sync staging prod --strategy target_wins
 
 # Delete keys in target that don't exist in source
-envault sync staging prod --allow-delete
+rh-envault sync staging prod --allow-delete
 
 # Skip certain keys
-envault sync staging prod --skip DB_HOST --skip DB_PORT
+rh-envault sync staging prod --skip DB_HOST --skip DB_PORT
 ```
 
-### `envault rotate <key>`
+### `rh-envault rotate <key>`
 
 Rotate a single environment variable with an auto-generated cryptographically secure value.
 
 ```bash
-envault rotate DB_PASSWORD
-envault rotate API_KEY --env prod
-envault rotate JWT_SECRET --length 64 --dry-run --show
-envault rotate-all --env prod
+rh-envault rotate DB_PASSWORD
+rh-envault rotate API_KEY --env prod
+rh-envault rotate JWT_SECRET --length 64 --dry-run --show
+rh-envault rotate-all --env prod
 ```
 
 Smart rotation infers the type of secret:
@@ -89,25 +89,25 @@ Smart rotation infers the type of secret:
 - `WEBHOOK_SECRET` → long hex key
 - Everything else → 32-char random string
 
-### `envault store`
+### `rh-envault store`
 
 Manage secret store integrations — read, write, and list secrets from external stores.
 
 ```bash
-envault store list
-envault store list --prefix /production/
-envault store get DB_PASSWORD --store my-vault
-envault store set DB_PASSWORD new_value --store my-vault
+rh-envault store list
+rh-envault store list --prefix /production/
+rh-envault store get DB_PASSWORD --store my-vault
+rh-envault store set DB_PASSWORD new_value --store my-vault
 ```
 
-### `envault audit`
+### `rh-envault audit`
 
 View the audit log of all diff, sync, and rotate operations.
 
 ```bash
-envault audit
-envault audit --key DB_PASSWORD
-envault audit --action rotate --limit 100
+rh-envault audit
+rh-envault audit --key DB_PASSWORD
+rh-envault audit --action rotate --limit 100
 ```
 
 ## Features
@@ -200,14 +200,14 @@ audit_log_path: .envault-audit.log
 
 ```bash
 # Block deployment if production has secrets that staging doesn't
-envault diff staging prod --fail-on-missing
+rh-envault diff staging prod --fail-on-missing
 
 # Rotate a secret and sync to all environments
-envault rotate DB_PASSWORD --env staging
-envault sync staging prod
+rh-envault rotate DB_PASSWORD --env staging
+rh-envault sync staging prod
 
 # Audit before deployment
-envault audit --action rotate --limit 20
+rh-envault audit --action rotate --limit 20
 ```
 
 ## Storage
