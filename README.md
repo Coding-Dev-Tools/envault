@@ -2,35 +2,18 @@
 
 **Environment variable syncing, diffing, and secret rotation — with secret-store integrations.**
 
-[![PyPI](https://img.shields.io/pypi/v/envault)](https://pypi.org/project/envault/)
-[![Python](https://img.shields.io/pypi/pyversions/envault)](https://pypi.org/project/envault/)
-[![License](https://img.shields.io/pypi/l/envault)](https://github.com/Coding-Dev-Tools/envault/blob/main/LICENSE)
+[![PyPI](https://img.shields.io/pypi/v/rh-envault)](https://pypi.org/project/rh-envault/)
+[![Python](https://img.shields.io/pypi/pyversions/rh-envault)](https://pypi.org/project/rh-envault/)
+[![License](https://img.shields.io/pypi/l/rh-envault)](https://github.com/Coding-Dev-Tools/envault/blob/main/LICENSE)
 [![CI](https://github.com/Coding-Dev-Tools/envault/actions/workflows/test.yml/badge.svg)](https://github.com/Coding-Dev-Tools/envault/actions/workflows/test.yml)
-[![Open Source Alternative](https://img.shields.io/badge/Open_Source_Alternative-%E2%87%92-blue?logo=opensourceinitiative)](https://www.opensourcealternative.to/project/envault)
-[![LibHunt](https://img.shields.io/badge/LibHunt-%E2%87%92-blue?logo=codeigniter)](https://www.libhunt.com/r/Coding-Dev-Tools/envault)
-[![Awesome Python](https://img.shields.io/badge/Awesome_Python-%E2%87%92-blue?logo=python)](https://github.com/uhub/awesome-python)
 
-**Why Envault?**
+**Why Envault?** Every team with more than one environment has been burned by a stale `.env.prod`, a secret that was rotated last month and nobody remembers, or a deployment that broke because `STAGING_DB_URL` pointed to production. Envault gives you a single CLI to diff environments, sync with conflict resolution, rotate secrets with smart type inference, and integrate with AWS SSM, HashiCorp Vault, Doppler, and 1Password — all from your terminal.
 
 ## Quick Start
 
 ```bash
-pip install envault
-```
+pip install rh-envault
 
-Or install via Homebrew (macOS/Linux):
-```bash
-brew tap Coding-Dev-Tools/tap
-brew install envault
-```
-
-Or install via Scoop (Windows):
-```bash
-scoop bucket add Coding-Dev-Tools https://github.com/Coding-Dev-Tools/scoop-bucket
-scoop install envault
-```
-
-```bash
 # Initialize a project
 envault init my-project
 
@@ -208,10 +191,10 @@ audit_log_path: .envault-audit.log
 
 | Store | Package | Install |
 |-------|---------|---------|
-| AWS SSM | `boto3` | `pip install envault[awsssm]` |
-| HashiCorp Vault | `hvac` | `pip install envault[vault]` |
-| Doppler | `requests` | `pip install envault[doppler]` |
-| 1Password | `onepasswordconnectsdk` | `pip install envault[onepassword]` |
+| AWS SSM | `boto3` | `pip install rh-envault[awsssm]` |
+| HashiCorp Vault | `hvac` | `pip install rh-envault[vault]` |
+| Doppler | `requests` | `pip install rh-envault[doppler]` |
+| 1Password | `onepasswordconnectsdk` | `pip install rh-envault[onepassword]` |
 
 ## CI/CD Integration
 
@@ -249,12 +232,3 @@ MIT — see [LICENSE](LICENSE)
 ---
 
 <sub>Part of [Revenue Holdings](https://coding-dev-tools.github.io/revenueholdings.dev/) — a suite of 10 developer CLI tools built by autonomous AI agents. Also check out [API Contract Guardian](https://github.com/Coding-Dev-Tools/api-contract-guardian) (breaking change detection), [DeployDiff](https://github.com/Coding-Dev-Tools/deploydiff) (infrastructure diffs), [json2sql](https://github.com/Coding-Dev-Tools/json2sql) (JSON → SQL), [ConfigDrift](https://github.com/Coding-Dev-Tools/configdrift) (config drift detection), [DeadCode](https://github.com/Coding-Dev-Tools/deadcode) (dead code cleanup), [APIAuth](https://github.com/Coding-Dev-Tools/apiauth) (API key management), [APIGhost](https://github.com/Coding-Dev-Tools/apighost) (mock API server), [SchemaForge](https://github.com/Coding-Dev-Tools/schemaforge) (ORM converter), and [click-to-mcp](https://github.com/Coding-Dev-Tools/click-to-mcp) (CLI → MCP server).</sub>
-
-
-## Install via npm
-
-```bash
-npm install -g envault-secrets
-```
-
-Then run: `envault --help`

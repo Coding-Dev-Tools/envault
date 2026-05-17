@@ -3,7 +3,7 @@ requires = ["setuptools>=68.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "envault"
+name = "rh-envault"
 version = "0.1.0"
 description = "Env variable syncing, diffing, and secret rotation CLI with secret-store integrations"
 readme = "README.md"
@@ -54,7 +54,7 @@ all = [
 ]
 
 [project.scripts]
-envault = "envault.cli:app"
+rh-envault = "envault.cli:app"
 
 [tool.setuptools.packages.find]
 where = ["src"]
