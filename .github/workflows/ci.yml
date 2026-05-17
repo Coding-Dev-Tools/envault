@@ -35,4 +35,4 @@ jobs:
 
       - name: Check CLI works
         run: |
-          envault --help
+          rh-envault --help
