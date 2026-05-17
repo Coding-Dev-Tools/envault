@@ -1,0 +1,34 @@
+{
+  "name": "envault-secrets",
+  "version": "0.1.0",
+  "description": "Secure environment variable manager for development teams. Encrypt, store, and share .env files.",
+  "author": "Revenue Holdings <engineering@revenueholdings.dev>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Coding-Dev-Tools/envault.git"
+  },
+  "homepage": "https://github.com/Coding-Dev-Tools/envault#readme",
+  "bugs": {
+    "url": "https://github.com/Coding-Dev-Tools/envault/issues"
+  },
+  "bin": {
+    "envault": "cli.js"
+  },
+  "keywords": [
+    "env",
+    "environment",
+    "secrets",
+    "vault",
+    "cli",
+    "dotenv",
+    "encryption"
+  ],
+  "files": [
+    "cli.js"
+  ],
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "preferGlobal": true
+}
