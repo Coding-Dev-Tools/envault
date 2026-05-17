@@ -6,8 +6,11 @@
 [![Python](https://img.shields.io/pypi/pyversions/envault)](https://pypi.org/project/envault/)
 [![License](https://img.shields.io/pypi/l/envault)](https://github.com/Coding-Dev-Tools/envault/blob/main/LICENSE)
 [![CI](https://github.com/Coding-Dev-Tools/envault/actions/workflows/test.yml/badge.svg)](https://github.com/Coding-Dev-Tools/envault/actions/workflows/test.yml)
+[![Open Source Alternative](https://img.shields.io/badge/Open_Source_Alternative-%E2%87%92-blue?logo=opensourceinitiative)](https://www.opensourcealternative.to/project/envault)
+[![LibHunt](https://img.shields.io/badge/LibHunt-%E2%87%92-blue?logo=codeigniter)](https://www.libhunt.com/r/Coding-Dev-Tools/envault)
+[![Awesome Python](https://img.shields.io/badge/Awesome_Python-%E2%87%92-blue?logo=python)](https://github.com/uhub/awesome-python)
 
-**Why Envault?** Every team with more than one environment has been burned by a stale `.env.prod`, a secret that was rotated last month and nobody remembers, or a deployment that broke because `STAGING_DB_URL` pointed to production. Envault gives you a single CLI to diff environments, sync with conflict resolution, rotate secrets with smart type inference, and integrate with AWS SSM, HashiCorp Vault, Doppler, and 1Password — all from your terminal.
+**Why Envault?**
 
 ## Quick Start
 
