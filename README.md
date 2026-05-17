@@ -130,7 +130,7 @@ Envault is one of eight tools in the Revenue Holdings suite. One license covers 
 |------|-------|----------|
 | **Free** | $0 | Individual devs, OSS — CLI only, rate-limited |
 | **Envault Individual** | **$12/mo** ($10 billed annually) | Professional devs — unlimited syncs, secret stores, audit |
-| **Suite (all 8 tools)** | **$49/mo** ($39 billed annually) | Full Revenue Holdings toolkit — 40% savings |
+| **Suite (all 10 tools)** | **$49/mo** ($39 billed annually) | Full Revenue Holdings toolkit — 40% savings |
 | **Team** | **$79/mo** ($63 billed annually) | Up to 5 devs — shared configs, team dashboard, alerts |
 | **Enterprise** | Custom | SSO, RBAC, compliance reports, dedicated support |
 
