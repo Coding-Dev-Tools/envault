@@ -19,9 +19,9 @@ classifiers = [
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
-  "Programming Language :: Python :: 3.12",
-  "Programming Language :: Python :: 3.13",
-  "Topic :: Utilities",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Utilities",
     "Topic :: Security",
 ]
 
@@ -45,7 +45,10 @@ vault = ["hvac>=2.0.0"]
 awsssm = ["boto3>=1.28.0"]
 doppler = ["requests>=2.31.0"]
 onepassword = ["onepasswordconnectsdk>=1.1.0"]
-dev = ["pytest>=7.0", "pytest-cov", "responses>=0.24.0"
+dev = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "responses>=0.24.0",
     "ruff>=0.4.0",
 ]
 licensing = ["revenueholdings-license>=0.1.0"]
