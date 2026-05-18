@@ -68,6 +68,7 @@ def diff(
     source_file: str | None = typer.Option(None, "--source", "-s", help="Source .env file path (overrides env name)"),
     target_file: str | None = typer.Option(None, "--target", "-t", help="Target .env file path (overrides env name)"),
     config_path: str = typer.Option("", "--config", "-c", help="Config file path"),
+    fail_on_missing: bool = typer.Option(False, "--fail-on-missing", help="Exit with code 1 if source has keys not in target"),
 ):
     """Diff environment variables between two environments or .env files."""
     config = load_config(config_path)
@@ -85,6 +86,10 @@ def diff(
 
     if result.has_differences:
         console.print(f"\nTotal: {result.total_differences} difference(s)")
+
+    if fail_on_missing and result.only_in_source:
+        raise typer.Exit(1)
+
     raise typer.Exit(0)
 
 
@@ -92,12 +97,17 @@ def diff(
 def diff_files(
     file1: str = typer.Argument(..., help="First .env file"),
     file2: str = typer.Argument(..., help="Second .env file"),
+    fail_on_missing: bool = typer.Option(False, "--fail-on-missing", help="Exit with code 1 if source has keys not in target"),
 ):
     """Diff two .env files directly (no config needed)."""
     result = diff_env_files(file1, file2)
     console.print(format_diff(result, Path(file1).name, Path(file2).name))
     if result.has_differences:
         console.print(f"\nTotal: {result.total_differences} difference(s)")
+
+    if fail_on_missing and result.only_in_source:
+        raise typer.Exit(1)
+
     raise typer.Exit(0)
 
 
