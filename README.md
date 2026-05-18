@@ -100,6 +100,7 @@ rh-envault store list
 rh-envault store list --prefix /production/
 rh-envault store get DB_PASSWORD --store my-vault
 rh-envault store set DB_PASSWORD new_value --store my-vault
+rh-envault store delete DB_PASSWORD --store my-vault
 ```
 
 ### `rh-envault audit`
