@@ -547,3 +547,140 @@ def test_decrypt_no_salt_fails(tmp_path):
 
     with pytest.raises(FileNotFoundError, match="Salt file"):
         decrypt_env(encrypted, password="p")
+
+
+# ── CLI Integration Tests ──────────────────────────────────────────────────
+
+
+def test_cli_diff_identical(tmp_path):
+    """diff exits 0 when files are identical."""
+    from typer.testing import CliRunner
+    from envault.cli import app
+
+    env_a = tmp_path / "a.env"
+    env_b = tmp_path / "b.env"
+    env_a.write_text("KEY=value\n")
+    env_b.write_text("KEY=value\n")
+
+    runner = CliRunner()
+    result = runner.invoke(app, ["diff", "--source", str(env_a), "--target", str(env_b)])
+    assert result.exit_code == 0
+    assert "identical" in result.stdout.lower()
+
+
+def test_cli_diff_different(tmp_path):
+    """diff exits 0 by default when files differ (backward compat)."""
+    from typer.testing import CliRunner
+    from envault.cli import app
+
+    env_a = tmp_path / "a.env"
+    env_b = tmp_path / "b.env"
+    env_a.write_text("KEY=old\n")
+    env_b.write_text("KEY=new\n")
+
+    runner = CliRunner()
+    result = runner.invoke(app, ["diff", "--source", str(env_a), "--target", str(env_b)])
+    assert result.exit_code == 0
+
+
+def test_cli_diff_fail_on_missing_exits_1(tmp_path):
+    """diff --fail-on-missing exits 1 when source has keys not in target."""
+    from typer.testing import CliRunner
+    from envault.cli import app
+
+    env_a = tmp_path / "a.env"
+    env_b = tmp_path / "b.env"
+    env_a.write_text("KEY_A=value_a\nKEY_B=value_b\n")
+    env_b.write_text("KEY_A=value_a\n")
+
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        ["diff", "--source", str(env_a), "--target", str(env_b), "--fail-on-missing"],
+    )
+    assert result.exit_code == 1
+    assert "Only in" in result.stdout
+
+
+def test_cli_diff_fail_on_missing_exits_0_when_no_missing(tmp_path):
+    """diff --fail-on-missing exits 0 when source has no missing keys in target."""
+    from typer.testing import CliRunner
+    from envault.cli import app
+
+    env_a = tmp_path / "a.env"
+    env_b = tmp_path / "b.env"
+    env_a.write_text("KEY_A=value_a\n")
+    env_b.write_text("KEY_A=value_a\nKEY_B=value_b\n")
+
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        ["diff", "--source", str(env_a), "--target", str(env_b), "--fail-on-missing"],
+    )
+    assert result.exit_code == 0
+
+
+def test_cli_diff_files_fail_on_missing(tmp_path):
+    """diff-files --fail-on-missing exits 1 when source has keys not in target."""
+    from typer.testing import CliRunner
+    from envault.cli import app
+
+    env_a = tmp_path / "a.env"
+    env_b = tmp_path / "b.env"
+    env_a.write_text("ONLY_IN_A=value\n")
+    env_b.write_text("")
+
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        ["diff-files", str(env_a), str(env_b), "--fail-on-missing"],
+    )
+    assert result.exit_code == 1
+    assert "Only in" in result.stdout
+
+
+def test_cli_diff_files_fail_on_missing_ok(tmp_path):
+    """diff-files --fail-on-missing exits 0 when all source keys exist in target."""
+    from typer.testing import CliRunner
+    from envault.cli import app
+
+    env_a = tmp_path / "a.env"
+    env_b = tmp_path / "b.env"
+    env_a.write_text("SHARED=val\n")
+    env_b.write_text("SHARED=val\nUNIQUE=val\n")
+
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        ["diff-files", str(env_a), str(env_b), "--fail-on-missing"],
+    )
+    assert result.exit_code == 0
+
+
+def test_cli_help():
+    """CLI --help shows expected commands."""
+    from typer.testing import CliRunner
+    from envault.cli import app
+
+    runner = CliRunner()
+    result = runner.invoke(app, ["--help"])
+    assert result.exit_code == 0
+    assert "diff" in result.stdout
+    assert "diff-files" in result.stdout
+    assert "sync" in result.stdout
+    assert "rotate" in result.stdout
+    assert "store" in result.stdout
+    assert "audit" in result.stdout
+    assert "encrypt" in result.stdout
+    assert "decrypt" in result.stdout
+
+
+def test_cli_version():
+    """CLI version shows version string."""
+    from typer.testing import CliRunner
+    from envault.cli import app
+
+    runner = CliRunner()
+    result = runner.invoke(app, ["version"])
+    assert result.exit_code == 0
+    assert "0.1.0" in result.stdout
