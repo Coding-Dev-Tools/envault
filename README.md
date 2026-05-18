@@ -1,4 +1,6 @@
- Envault CLI
+# Envault CLI
+
+[![GitHub stars](https://img.shields.io/github/stars/Coding-Dev-Tools/envault?style=social)](https://github.com/Coding-Dev-Tools/envault/stargazers)
 
 **Environment variable syncing, diffing, and secret rotation — with secret-store integrations.**
 
@@ -6,6 +8,8 @@
 [![Python](https://img.shields.io/pypi/pyversions/rh-envault)](https://pypi.org/project/rh-envault/)
 [![License](https://img.shields.io/pypi/l/rh-envault)](https://github.com/Coding-Dev-Tools/envault/blob/main/LICENSE)
 [![CI](https://github.com/Coding-Dev-Tools/envault/actions/workflows/ci.yml/badge.svg)](https://github.com/Coding-Dev-Tools/envault/actions/workflows/ci.yml)
+[![Open Source Alternative](https://img.shields.io/badge/Open_Source_Alternative-%E2%87%92-blue?logo=opensourceinitiative)](https://www.opensourcealternative.to/project/envault)
+[![LibHunt](https://img.shields.io/badge/LibHunt-%E2%87%92-blue?logo=codeigniter)](https://www.libhunt.com/r/Coding-Dev-Tools/envault)
 
 > ⭐ **Star this repo** if you manage environment variables — it helps other developers find Envault!
 
