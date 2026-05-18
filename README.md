@@ -9,7 +9,7 @@
 
 > ⭐ **Star this repo** if you manage environment variables — it helps other developers find Envault!
 
-**Why Envault?**
+**Why Envault?** Managing .env files across dev, staging, and prod is error-prone — copy-pasting secrets between environments, accidentally committing .env to git, rotating keys by hand across 5 files. Envault encrypts your .env files with a single master key, syncs them across environments, and rotates secrets without touching a text editor. One `envault push` encrypts and deploys. One `envault pull` decrypts and loads. No more plaintext secrets in .git history.
 
 ## Quick Start
 
