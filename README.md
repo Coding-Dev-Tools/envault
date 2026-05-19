@@ -4,12 +4,10 @@
 
 **Environment variable syncing, diffing, and secret rotation — with secret-store integrations.**
 
-[![PyPI](https://img.shields.io/pypi/v/rh-envault)](https://pypi.org/project/rh-envault/)
-[![Python](https://img.shields.io/pypi/pyversions/rh-envault)](https://pypi.org/project/rh-envault/)
-[![License](https://img.shields.io/pypi/l/rh-envault)](https://github.com/Coding-Dev-Tools/envault/blob/main/LICENSE)
+[![Python](https://img.shields.io/badge/python-3.10%2B-blue)](https://github.com/Coding-Dev-Tools/envault)
+[![License](https://img.shields.io/github/license/Coding-Dev-Tools/envault)](https://github.com/Coding-Dev-Tools/envault/blob/main/LICENSE)
 [![CI](https://github.com/Coding-Dev-Tools/envault/actions/workflows/ci.yml/badge.svg)](https://github.com/Coding-Dev-Tools/envault/actions/workflows/ci.yml)
 [![Open Source Alternative](https://img.shields.io/badge/Open_Source_Alternative-%E2%87%92-blue?logo=opensourceinitiative)](https://www.opensourcealternative.to/project/envault)
-[![LibHunt](https://img.shields.io/badge/LibHunt-%E2%87%92-blue?logo=codeigniter)](https://www.libhunt.com/r/Coding-Dev-Tools/envault)
 
 > ⭐ **Star this repo** if you manage environment variables — it helps other developers find Envault!
 
@@ -17,8 +15,10 @@
 
 ## Quick Start
 
+> **Note:** rh-envault is not yet published to PyPI. Install directly from GitHub.
+
 ```bash
-pip install rh-envault
+pip install git+https://github.com/Coding-Dev-Tools/envault.git
 
 # Initialize a project
 rh-envault init my-project
@@ -196,12 +196,12 @@ audit_log_path: .envault-audit.log
 
 ## Secret Store Integrations
 
-| Store | Package | Install |
-|-------|---------|---------|
-| AWS SSM | `boto3` | `pip install rh-envault[awsssm]` |
-| HashiCorp Vault | `hvac` | `pip install rh-envault[vault]` |
-| Doppler | `requests` | `pip install rh-envault[doppler]` |
-| 1Password | `onepasswordconnectsdk` | `pip install rh-envault[onepassword]` |
+| Store | Package | Install (from GitHub) |
+|-------|---------|----------------------|
+| AWS SSM | `boto3` | `pip install "rh-envault[awsssm] @ git+https://..."` |
+| HashiCorp Vault | `hvac` | `pip install "rh-envault[vault] @ git+https://..."` |
+| Doppler | `requests` | `pip install "rh-envault[doppler] @ git+https://..."` |
+| 1Password | `onepasswordconnectsdk` | `pip install "rh-envault[onepassword] @ git+https://..."` |
 
 ## CI/CD Integration
 
