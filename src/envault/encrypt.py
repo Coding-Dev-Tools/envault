@@ -5,8 +5,8 @@ Usage:
     envault decrypt .env.locked    # Decrypt .env.locked -> .env
 
 The encryption key is derived from a master password via PBKDF2.
-Key can also be stored in REVENUEHOLDINGS_LICENSE_KEY env var or
-passed via --key flag for CI/CD.
+Key can also be stored in ENVAULT_ENCRYPT_KEY env var or
+passed via --password flag for CI/CD.
 """
 from __future__ import annotations
 
