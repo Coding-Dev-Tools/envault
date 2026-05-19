@@ -447,6 +447,80 @@ def test_store_factory_unknown():
         get_store(config)
 
 
+# ── Store Delete CLI Tests ──────────────────────────────────────────────────
+
+
+def test_cli_store_delete_ok(tmp_path):
+    """store delete exits 0 and removes the key via config'd store."""
+    from typer.testing import CliRunner
+    from envault.cli import app
+    import yaml
+
+    # Create valid .envault.yml with a local store pointing at our env file
+    env_file = tmp_path / ".env"
+    env_file.write_text("MY_KEY=my_value\nOTHER=keep\n")
+
+    envault_config = {
+        "project": "test",
+        "stores": {
+            "local": {
+                "type": "local",
+                "path_prefix": str(env_file),
+            }
+        }
+    }
+    config_path = tmp_path / ".envault.yml"
+    with open(config_path, "w") as f:
+        yaml.dump(envault_config, f)
+
+    runner = CliRunner()
+    result = runner.invoke(app, [
+        "store", "delete", "MY_KEY",
+        "--store", "local",
+        "-c", str(config_path),
+    ])
+    assert result.exit_code == 0, f"stdout: {result.stdout}"
+    assert "Deleted" in result.stdout
+
+    # Verify key was actually deleted
+    from envault.stores import LocalEnvStore
+    store = LocalEnvStore(str(env_file))
+    assert store.get("MY_KEY") is None
+    assert store.get("OTHER") == "keep"
+
+
+def test_cli_store_delete_not_found(tmp_path):
+    """store delete exits 1 when key doesn't exist."""
+    from typer.testing import CliRunner
+    from envault.cli import app
+    import yaml
+
+    env_file = tmp_path / ".env"
+    env_file.write_text("OTHER=value\n")
+
+    envault_config = {
+        "project": "test",
+        "stores": {
+            "local": {
+                "type": "local",
+                "path_prefix": str(env_file),
+            }
+        }
+    }
+    config_path = tmp_path / ".envault.yml"
+    with open(config_path, "w") as f:
+        yaml.dump(envault_config, f)
+
+    runner = CliRunner()
+    result = runner.invoke(app, [
+        "store", "delete", "NONEXISTENT",
+        "--store", "local",
+        "-c", str(config_path),
+    ])
+    assert result.exit_code == 1
+    assert "not found" in result.output.lower() or "Error" in result.output
+
+
 # ── Encrypt / Decrypt ───────────────────────────────────────────────────────
 
 

@@ -100,6 +100,7 @@ rh-envault store list
 rh-envault store list --prefix /production/
 rh-envault store get DB_PASSWORD --store my-vault
 rh-envault store set DB_PASSWORD new_value --store my-vault
+rh-envault store delete DB_PASSWORD --store my-vault
 ```
 
 ### `rh-envault audit`
@@ -157,7 +158,7 @@ Envault is one of 11 tools in the DevForge suite. One license covers all CLI too
 ---
 
 <p align="center">
-  <sub>Part of <a href="https://coding-dev-tools.github.io/devforge.dev/">DevForge</a> — CLI tools built by autonomous AI.</sub>
+  <sub>Part of <a href="https://coding-dev-tools.github.io/revenueholdings.dev/">Revenue Holdings</a> — CLI tools built by autonomous AI.</sub>
 </p>
 
 ## Configuration

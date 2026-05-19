@@ -351,6 +351,27 @@ def store_set(
     console.print(f"[green]✓[/green] Set {key}")
 
 
+@store_app.command("delete")
+def store_delete(
+    key: str = typer.Argument(..., help="Key to delete"),
+    store_name: str | None = typer.Option(None, "--store", "-s", help="Store name from config"),
+    config_path: str = typer.Option("", "--config", "-c", help="Config file path"),
+):
+    """Delete a secret from a secret store."""
+    config = load_config(config_path)
+
+    if store_name and store_name in config.stores:
+        store_instance = get_store(config.stores[store_name])
+    else:
+        store_instance = get_store(config_path)
+
+    if store_instance.delete(key):
+        console.print(f"[green]✓[/green] Deleted {key}")
+    else:
+        err_console.print(f"[red]Error:[/red] Key '{key}' not found in store")
+        raise typer.Exit(1)
+
+
 # ── Encrypt / Decrypt ──────────────────────────────────────────────────────────
 
 @app.command()
