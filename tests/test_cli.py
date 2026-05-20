@@ -438,3 +438,61 @@ def test_audit_cli_filter_key(runner: CliRunner, tmp_path):
     result = runner.invoke(app, ["audit", "--key", "DB_PASSWORD", "--config", config_path])
     assert result.exit_code == 0
     assert "API_KEY" not in result.stdout
+
+
+# ── Rotate (Single Key) ───────────────────────────────────────────────────────
+
+
+def test_rotate_dry_run(runner: CliRunner, tmp_path):
+    """rotate a single key with --dry-run should show new value without modifying."""
+    import yaml
+    env_file = tmp_path / ".env.dev"
+    env_file.write_text("DB_PASSWORD=old_secret\nAPI_KEY=keep_this\n")
+    config = {
+        "project": "test",
+        "environments": [{"name": "dev", "env_file": str(env_file)}],
+        "audit_log_path": str(tmp_path / ".envault-audit.log"),
+    }
+    config_path = tmp_path / ".envault.yml"
+    with open(config_path, "w") as f:
+        yaml.dump(config, f)
+
+    result = runner.invoke(app, [
+        "rotate", "DB_PASSWORD",
+        "--env", "dev",
+        "--length", "16",
+        "--dry-run",
+        "--show",
+        "--config", str(config_path),
+    ])
+    assert result.exit_code == 0
+    assert "Would rotate" in result.stdout or "Dry run" in result.stdout
+    assert "DB_PASSWORD" in result.stdout
+
+    # Verify original file is unchanged
+    content = env_file.read_text()
+    assert "old_secret" in content
+
+
+def test_rotate_key_not_found(runner: CliRunner, tmp_path):
+    """rotate on a non-existent key should exit with error."""
+    import yaml
+    env_file = tmp_path / ".env.dev"
+    env_file.write_text("EXISTING_KEY=value\n")
+    config = {
+        "project": "test",
+        "environments": [{"name": "dev", "env_file": str(env_file)}],
+        "audit_log_path": str(tmp_path / ".envault-audit.log"),
+    }
+    config_path = tmp_path / ".envault.yml"
+    with open(config_path, "w") as f:
+        yaml.dump(config, f)
+
+    result = runner.invoke(app, [
+        "rotate", "NONEXISTENT_KEY",
+        "--env", "dev",
+        "--dry-run",
+        "--config", str(config_path),
+    ])
+    assert result.exit_code != 0
+    assert "not found" in result.output.lower()
