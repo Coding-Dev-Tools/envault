@@ -118,6 +118,13 @@ def test_load_env_file_not_exists(tmp_path):
     assert result == {}
 
 
+def test_load_env_content():
+    from envault.diff import load_env_content
+    assert load_env_content("KEY=one\nFOO=two\n") == {"KEY": "one", "FOO": "two"}
+    assert load_env_content("") == {}
+    assert load_env_content("# comment\nKEY=val\n\nFOO=bar\n") == {"KEY": "val", "FOO": "bar"}
+
+
 def test_format_diff_identical():
     result = diff_envs({"A": "1"}, {"A": "1"})
     output = format_diff(result)
@@ -445,6 +452,18 @@ def test_store_factory_unknown():
     config = SecretStoreConfig(type="nonexistent")
     with pytest.raises(SecretStoreError):
         get_store(config)
+
+
+def test_local_store_list_keys_with_prefix(tmp_path):
+    """LocalEnvStore.list_keys filters by prefix."""
+    from envault.stores import LocalEnvStore
+    env_file = tmp_path / ".env"
+    env_file.write_text("DB_HOST=localhost\nDB_PORT=5432\nAPI_KEY=abc\n")
+    store = LocalEnvStore(str(env_file))
+    db_keys = store.list_keys(prefix="DB_")
+    assert "DB_HOST" in db_keys
+    assert "DB_PORT" in db_keys
+    assert "API_KEY" not in db_keys
 
 
 # ── Store Delete CLI Tests ──────────────────────────────────────────────────
