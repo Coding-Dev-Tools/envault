@@ -51,7 +51,6 @@ dev = [
     "responses>=0.24.0",
     "ruff>=0.4.0",
 ]
-licensing = ["revenueholdings-license>=0.1.0"]
 all = [
     "hvac>=2.0.0",
     "boto3>=1.28.0",
