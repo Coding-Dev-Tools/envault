@@ -2,12 +2,10 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-
 import pytest
-from typer.testing import CliRunner
-
 from envault.cli import app
+from pathlib import Path
+from typer.testing import CliRunner
 
 
 @pytest.fixture
@@ -84,7 +82,7 @@ def test_init_existing_raises(runner: CliRunner, tmp_path):
 
 def _make_config(tmp_path, project="test", env_files=None):
     """Create a minimal .envault.yml for testing.
-    
+
     env_files: dict of {env_name: env_file_path}
     Paths can be relative (resolved against tmp_path) or absolute.
     """
@@ -101,7 +99,7 @@ def _make_config(tmp_path, project="test", env_files=None):
     with open(config_path, "w") as f:
         yaml.dump(config, f)
     # Create env files only if relative (absolute paths may already exist)
-    for name, path in env_files.items():
+    for _, path in env_files.items():
         p = Path(path)
         if not p.is_absolute():
             p = tmp_path / path
