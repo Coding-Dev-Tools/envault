@@ -301,3 +301,140 @@ def test_init_missing_project_name(runner: CliRunner):
     # Missing required argument — check combined output
     assert result.exit_code != 0
     assert "Missing argument" in result.output or "Error" in result.output
+
+
+# ── Rotate All ────────────────────────────────────────────────────────────────
+
+
+def _make_config_with_env(tmp_path, project="test", env_name="dev", env_content="KEY=value\nFOO=bar\n"):
+    """Create a minimal .envault.yml and a matching .env file."""
+    import yaml
+    env_file = tmp_path / f".env.{env_name}"
+    env_file.write_text(env_content)
+    config = {
+        "project": project,
+        "environments": [
+            {"name": env_name, "env_file": str(env_file)}
+        ],
+        "audit_log_path": str(tmp_path / ".envault-audit.log"),
+    }
+    config_path = tmp_path / ".envault.yml"
+    with open(config_path, "w") as f:
+        yaml.dump(config, f)
+    return str(config_path)
+
+
+def test_rotate_all_dry_run(runner: CliRunner, tmp_path):
+    config_path = _make_config_with_env(tmp_path, env_content="DB_PASSWORD=secret\nAPI_KEY=abc\n")
+    result = runner.invoke(app, ["rotate-all", "--env", "dev", "--dry-run", "--config", config_path])
+    assert result.exit_code == 0
+    assert "Dry run" in result.stdout or "Would rotate" in result.stdout
+
+
+def test_rotate_all_no_variables(runner: CliRunner, tmp_path):
+    config_path = _make_config_with_env(tmp_path, env_content="")
+    result = runner.invoke(app, ["rotate-all", "--env", "dev", "--dry-run", "--config", config_path])
+    assert result.exit_code == 0
+    assert "No variables" in result.stdout
+
+
+def test_rotate_all_env_not_found(runner: CliRunner, tmp_path):
+    config_path = _make_config_with_env(tmp_path)
+    result = runner.invoke(app, ["rotate-all", "--env", "nonexistent", "--dry-run", "--config", config_path])
+    assert result.exit_code != 0
+    assert "not found" in result.output.lower()
+
+
+# ── Store Commands ────────────────────────────────────────────────────────────
+
+
+def _make_store_config(tmp_path, env_content="KEY=val\nOTHER=keep\n"):
+    """Create .envault.yml with a local store."""
+    import yaml
+    env_file = tmp_path / ".env"
+    env_file.write_text(env_content)
+    config = {
+        "project": "test",
+        "stores": {
+            "local": {
+                "type": "local",
+                "path_prefix": str(env_file),
+            }
+        },
+    }
+    config_path = tmp_path / ".envault.yml"
+    with open(config_path, "w") as f:
+        yaml.dump(config, f)
+    return str(config_path), str(env_file)
+
+
+def test_store_list_prefix(runner: CliRunner, tmp_path):
+    config_path, _ = _make_store_config(tmp_path, env_content="DB_HOST=localhost\nDB_PORT=5432\nAPI_KEY=abc\n")
+    result = runner.invoke(app, ["store", "list", "local", "--prefix", "DB_", "--config", config_path])
+    assert result.exit_code == 0
+    assert "DB_HOST" in result.stdout
+    assert "API_KEY" not in result.stdout
+
+
+def test_store_get_not_found(runner: CliRunner, tmp_path):
+    config_path, _ = _make_store_config(tmp_path)
+    result = runner.invoke(app, ["store", "get", "NONEXISTENT", "--store", "local", "--config", config_path])
+    assert result.exit_code == 1
+    assert "not found" in result.output.lower()
+
+
+def test_store_set_and_get(runner: CliRunner, tmp_path):
+    config_path, _ = _make_store_config(tmp_path)
+    set_result = runner.invoke(app, ["store", "set", "NEW_KEY", "new_value", "--store", "local", "--config", config_path])
+    assert set_result.exit_code == 0
+    assert "Set" in set_result.stdout
+    get_result = runner.invoke(app, ["store", "get", "NEW_KEY", "--store", "local", "--config", config_path])
+    assert get_result.exit_code == 0
+    assert "new_value" in get_result.stdout
+
+
+# ── Audit CLI ─────────────────────────────────────────────────────────────────
+
+
+def _make_audit_config(tmp_path):
+    """Create config with an audit log file."""
+    import yaml
+    config = {
+        "project": "test",
+        "environments": [],
+        "audit_log_path": str(tmp_path / ".envault-audit.log"),
+    }
+    config_path = tmp_path / ".envault.yml"
+    with open(config_path, "w") as f:
+        yaml.dump(config, f)
+    return str(config_path)
+
+
+def test_audit_cli_no_entries(runner: CliRunner, tmp_path):
+    config_path = _make_audit_config(tmp_path)
+    result = runner.invoke(app, ["audit", "--config", config_path])
+    assert result.exit_code == 0
+    assert "No audit entries" in result.stdout
+
+
+def test_audit_cli_with_entries(runner: CliRunner, tmp_path):
+    from envault.audit import AuditLogger
+    config_path = _make_audit_config(tmp_path)
+    log_path = str(tmp_path / ".envault-audit.log")
+    AuditLogger(log_path).log("rotate", "DB_PASSWORD", env_file=".env.prod")
+    AuditLogger(log_path).log("add", "API_KEY", source_path=".env.dev", target_path=".env.prod")
+    result = runner.invoke(app, ["audit", "--config", config_path])
+    assert result.exit_code == 0
+    assert "DB_PASSWORD" in result.stdout
+    assert "rotate" in result.stdout or "add" in result.stdout
+
+
+def test_audit_cli_filter_key(runner: CliRunner, tmp_path):
+    from envault.audit import AuditLogger
+    config_path = _make_audit_config(tmp_path)
+    log_path = str(tmp_path / ".envault-audit.log")
+    AuditLogger(log_path).log("rotate", "DB_PASSWORD", env_file=".env.prod")
+    AuditLogger(log_path).log("set", "API_KEY", env_file=".env.prod")
+    result = runner.invoke(app, ["audit", "--key", "DB_PASSWORD", "--config", config_path])
+    assert result.exit_code == 0
+    assert "API_KEY" not in result.stdout
