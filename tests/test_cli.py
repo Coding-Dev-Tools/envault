@@ -494,3 +494,70 @@ def test_rotate_key_not_found(runner: CliRunner, tmp_path):
     ])
     assert result.exit_code != 0
     assert "not found" in result.output.lower()
+
+
+# ── Decrypt --delete ────────────────────────────────────────────────────────
+
+
+def test_decrypt_cli_delete_encrypted(runner: CliRunner, tmp_path):
+    """decrypt --delete should remove the encrypted file after decryption."""
+    env_file = tmp_path / ".env.test"
+    env_file.write_text("MY_SECRET=hello\n")
+    encrypted = tmp_path / ".env.test.locked"
+
+    # Encrypt first
+    result_enc = runner.invoke(app, ["encrypt", str(env_file), "--output", str(encrypted), "--password", "del-test"])
+    assert result_enc.exit_code == 0
+    assert encrypted.exists()
+
+    # Decrypt with --delete
+    decrypted = tmp_path / ".env.restored"
+    result_dec = runner.invoke(app, ["decrypt", str(encrypted), "--output", str(decrypted), "--password", "del-test", "--delete"])
+    assert result_dec.exit_code == 0
+    assert "Deleted encrypted" in result_dec.stdout
+    assert decrypted.exists()
+    assert not encrypted.exists()  # encrypted file removed
+    assert decrypted.read_text() == "MY_SECRET=hello\n"
+
+
+# ── Sync Actual Execution ───────────────────────────────────────────────────
+
+
+def test_sync_actual_execution(runner: CliRunner, tmp_path):
+    """sync without --dry-run should write changes to target file."""
+    src = tmp_path / "env.dev"
+    tgt = tmp_path / "env.prod"
+    config_path = _make_config(tmp_path, env_files={"dev": str(src), "prod": str(tgt)})
+    src.write_text("KEY=new_val\nNEW_KEY=hello\n")
+    tgt.write_text("KEY=old_val\nSTALE=bye\n")
+
+    result = runner.invoke(app, [
+        "sync", "dev", "prod",
+        "--strategy", "source_wins",
+        "--allow-delete",
+        "--config", config_path,
+    ])
+    assert result.exit_code == 0
+    assert "Synced" in result.stdout or "synced" in result.stdout.lower()
+
+    # Verify target was actually modified
+    content = tgt.read_text()
+    assert "KEY=new_val" in content
+    assert "NEW_KEY=hello" in content
+    assert "STALE" not in content  # deleted via --allow-delete
+
+
+def test_sync_already_in_sync(runner: CliRunner, tmp_path):
+    """sync on identical files should report already in sync."""
+    src = tmp_path / "env.dev"
+    tgt = tmp_path / "env.prod"
+    config_path = _make_config(tmp_path, env_files={"dev": str(src), "prod": str(tgt)})
+    src.write_text("KEY=value\n")
+    tgt.write_text("KEY=value\n")
+
+    result = runner.invoke(app, [
+        "sync", "dev", "prod",
+        "--config", config_path,
+    ])
+    assert result.exit_code == 0
+    assert "already in sync" in result.stdout.lower()
