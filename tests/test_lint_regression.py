@@ -1,0 +1,26 @@
+"""Lint regression tests — guard against specific rule violations.
+
+These tests assert zero violations for a specific ruff rule in a scoped
+directory. They fail if a new violation is introduced, providing a durable
+regression guard analogous to a behavioral test.
+"""
+
+import subprocess
+import sys
+
+REPO_ROOT = __file__.rsplit("/", 2)[0] if "/" in __file__ else None
+if REPO_ROOT is None:
+    REPO_ROOT = __file__.rsplit("\\", 2)[0]
+
+
+def test_tests_dir_has_zero_f401_violations() -> None:
+    """tests/ must have zero F401 (unused-import) violations."""
+    result = subprocess.run(
+        [sys.executable, "-m", "ruff", "check", "--select=F401",
+         "--output-format=concise", "tests/"],
+        cwd=REPO_ROOT,
+        capture_output=True, text=True,
+    )
+    assert result.returncode == 0, (
+        f"tests/ has F401 violation(s):\n{result.stdout}\n"
+    )

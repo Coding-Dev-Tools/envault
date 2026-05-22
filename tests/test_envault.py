@@ -809,7 +809,7 @@ def test_encrypt_password_from_env_var(tmp_path, monkeypatch):
 
 def test_decrypt_default_output_path(tmp_path):
     """Decrypt without output_path uses stripped filename."""
-    from envault.encrypt import encrypt_env, decrypt_env, SALT_FILE
+    from envault.encrypt import decrypt_env, encrypt_env
 
     env_file = tmp_path / ".env.staging"
     env_file.write_text("KEY=val\n")
@@ -833,7 +833,7 @@ def test_is_encrypted_by_suffix(tmp_path):
 
 def test_encrypt_delete_encrypted_roundtrip(tmp_path):
     """Decrypt with delete_encrypted removes the encrypted file."""
-    from envault.encrypt import encrypt_env, decrypt_env
+    from envault.encrypt import decrypt_env, encrypt_env
 
     env_file = tmp_path / ".env"
     env_file.write_text("KEY=val\n")
