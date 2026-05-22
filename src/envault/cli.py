@@ -3,11 +3,6 @@
 from __future__ import annotations
 
 import typer
-from pathlib import Path
-from rich.console import Console
-from rich.prompt import Confirm
-from rich.table import Table
-
 from envault import __version__
 from envault.audit import AuditLogger
 from envault.config import EnvaultConfig, init_config
@@ -16,6 +11,10 @@ from envault.encrypt import decrypt_env, encrypt_env
 from envault.rotate import rotate_env_var
 from envault.stores import get_store
 from envault.sync import sync_env_files
+from pathlib import Path
+from rich.console import Console
+from rich.prompt import Confirm
+from rich.table import Table
 
 app = typer.Typer(
     name="envault",
@@ -24,9 +23,6 @@ app = typer.Typer(
 )
 console = Console()
 err_console = Console(stderr=True)
-
-
-
 
 
 def load_config(config_path: str = "") -> EnvaultConfig:

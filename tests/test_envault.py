@@ -777,3 +777,70 @@ def test_cli_version():
     result = runner.invoke(app, ["version"])
     assert result.exit_code == 0
     assert "0.1.0" in result.stdout
+
+
+def test_encrypt_nonexistent_file(tmp_path):
+    """Encrypting a non-existent file should raise FileNotFoundError."""
+    from envault.encrypt import encrypt_env
+
+    with pytest.raises(FileNotFoundError, match="not found"):
+        encrypt_env(tmp_path / "does_not_exist.env", password="p")
+
+
+def test_decrypt_nonexistent_file(tmp_path):
+    """Decrypting a non-existent file should raise FileNotFoundError."""
+    from envault.encrypt import decrypt_env
+
+    with pytest.raises(FileNotFoundError, match="not found"):
+        decrypt_env(tmp_path / "does_not_exist.locked", password="p")
+
+
+def test_encrypt_password_from_env_var(tmp_path, monkeypatch):
+    """Encryption password from ENVAULT_ENCRYPT_KEY env var."""
+    from envault.encrypt import encrypt_env
+
+    monkeypatch.setenv("ENVAULT_ENCRYPT_KEY", "env-var-password")
+    env_file = tmp_path / ".env"
+    env_file.write_text("KEY=val\n")
+
+    encrypted = encrypt_env(env_file)
+    assert encrypted.exists()
+
+
+def test_decrypt_default_output_path(tmp_path):
+    """Decrypt without output_path uses stripped filename."""
+    from envault.encrypt import encrypt_env, decrypt_env, SALT_FILE
+
+    env_file = tmp_path / ".env.staging"
+    env_file.write_text("KEY=val\n")
+    encrypted = encrypt_env(env_file, password="p")
+
+    # Decrypt back without explicit output path
+    decrypted = decrypt_env(encrypted, password="p")
+    # Default should strip .locked suffix from .env.staging.locked
+    assert decrypted.exists()
+    assert decrypted.read_text() == "KEY=val\n"
+
+
+def test_is_encrypted_by_suffix(tmp_path):
+    """is_encrypted detects files by .locked suffix even without Fernet prefix."""
+    from envault.encrypt import is_encrypted
+
+    fake = tmp_path / "secrets.env.locked"
+    fake.write_text("not actually fernet encrypted\n")
+    assert is_encrypted(fake)
+
+
+def test_encrypt_delete_encrypted_roundtrip(tmp_path):
+    """Decrypt with delete_encrypted removes the encrypted file."""
+    from envault.encrypt import encrypt_env, decrypt_env
+
+    env_file = tmp_path / ".env"
+    env_file.write_text("KEY=val\n")
+
+    encrypted = encrypt_env(env_file, password="p")
+    assert encrypted.exists()
+
+    decrypted = decrypt_env(encrypted, password="p", delete_encrypted=True)
+    assert decrypted.exists()
+    assert not encrypted.exists()  # encrypted file removed

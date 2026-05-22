@@ -301,6 +301,72 @@ def test_init_missing_project_name(runner: CliRunner):
     assert "Missing argument" in result.output or "Error" in result.output
 
 
+# ── Sync (actual execution) ─────────────────────────────────────────────────
+
+
+def test_sync_actual_execution(runner: CliRunner, tmp_path):
+    """sync should actually write changes to target file."""
+    src = tmp_path / "env.dev"
+    tgt = tmp_path / "env.prod"
+    config_path = _make_config(tmp_path, env_files={"dev": str(src), "prod": str(tgt)})
+    src.write_text("KEY=source_val\nSHARED=yes\n")
+    tgt.write_text("SHARED=yes\nLOCAL=keep\n")
+
+    result = runner.invoke(app, [
+        "sync", "dev", "prod",
+        "--strategy", "source_wins",
+        "--config", config_path,
+    ])
+    assert result.exit_code == 0
+    assert "Synced" in result.stdout
+    assert "Added" in result.stdout
+
+    # Verify target file was actually modified
+    content = tgt.read_text()
+    assert "KEY=source_val" in content
+    assert "SHARED=yes" in content
+    assert "LOCAL=keep" in content
+
+
+def test_sync_actual_execution_allow_delete(runner: CliRunner, tmp_path):
+    """sync --allow-delete should remove keys not in source."""
+    src = tmp_path / "env.dev"
+    tgt = tmp_path / "env.prod"
+    config_path = _make_config(tmp_path, env_files={"dev": str(src), "prod": str(tgt)})
+    src.write_text("KEY=source_val\n")
+    tgt.write_text("KEY=old_val\nOLDKEY=remove_me\n")
+
+    result = runner.invoke(app, [
+        "sync", "dev", "prod",
+        "--strategy", "source_wins",
+        "--allow-delete",
+        "--config", config_path,
+    ])
+    assert result.exit_code == 0
+
+    # Verify old key was removed
+    content = tgt.read_text()
+    assert "KEY=source_val" in content
+    assert "OLDKEY" not in content
+
+
+def test_sync_already_in_sync(runner: CliRunner, tmp_path):
+    """sync when already in sync should report no changes."""
+    src = tmp_path / "env.dev"
+    tgt = tmp_path / "env.prod"
+    config_path = _make_config(tmp_path, env_files={"dev": str(src), "prod": str(tgt)})
+    src.write_text("KEY=value\n")
+    tgt.write_text("KEY=value\n")
+
+    result = runner.invoke(app, [
+        "sync", "dev", "prod",
+        "--strategy", "source_wins",
+        "--config", config_path,
+    ])
+    assert result.exit_code == 0
+    assert "already in sync" in result.stdout.lower()
+
+
 # ── Rotate All ────────────────────────────────────────────────────────────────
 
 
@@ -494,3 +560,21 @@ def test_rotate_key_not_found(runner: CliRunner, tmp_path):
     ])
     assert result.exit_code != 0
     assert "not found" in result.output.lower()
+
+
+def test_rotate_cli_actual(runner: CliRunner, tmp_path):
+    """rotate should replace the value in the env file (not just dry-run)."""
+    env_file = tmp_path / ".env.dev"
+    config_path = _make_config(tmp_path, env_files={"dev": str(env_file)})
+    env_file.write_text("DB_PASSWORD=old_password\nKEY=value\n")
+
+    result = runner.invoke(app, [
+        "rotate", "DB_PASSWORD",
+        "--env", "dev",
+        "--config", config_path,
+    ])
+    assert result.exit_code == 0
+    assert "Rotated" in result.stdout
+    content = env_file.read_text()
+    assert "old_password" not in content
+    assert "KEY=value" in content  # other keys untouched
