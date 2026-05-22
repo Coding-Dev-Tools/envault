@@ -26,9 +26,6 @@ console = Console()
 err_console = Console(stderr=True)
 
 
-
-
-
 def load_config(config_path: str = "") -> EnvaultConfig:
     """Load config, optionally from a specific path."""
     path = config_path if config_path else ".envault.yml"
