@@ -42,7 +42,9 @@ def test_tests_dir_has_zero_f841_violations() -> None:
 def test_tests_dir_has_zero_f811_violations() -> None:
     """tests/ must have zero F811 (redefinition) violations."""
     result = subprocess.run(
-        [sys.executable, "-m", "ruff", "check", "tests/", "--select", "F811"],
+        [sys.executable, "-m", "ruff", "check", "--select=F811",
+         "--output-format=concise", "tests/"],
+        cwd=REPO_ROOT,
         capture_output=True, text=True, check=False,
     )
     assert result.returncode == 0, (
