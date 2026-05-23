@@ -10,13 +10,11 @@ Covers:
 
 from __future__ import annotations
 
-from pathlib import Path
-
 from envault.audit import AuditLogger
 from envault.config import EnvaultConfig
 from envault.diff import _mask_value, diff_envs, format_diff
 from envault.rotate import rotate_env_var, rotate_value
-
+from pathlib import Path
 
 # ── audit.py: log() with optional fields ────────────────────────────────────
 
@@ -216,7 +214,6 @@ def test_rotate_env_var_special_chars_in_new_value(tmp_path):
     # Force a value with special chars by rotating a non-matching key
     success, new_val = rotate_env_var("WEBHOOK_URL", str(env_file))
     assert success
-    content = env_file.read_text()
     # The file should still be parseable (key=value or key="value")
     from dotenv import dotenv_values
     reloaded = dotenv_values(str(env_file))
