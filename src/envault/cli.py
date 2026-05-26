@@ -2,7 +2,13 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import typer
+from rich.console import Console
+from rich.prompt import Confirm
+from rich.table import Table
+
 from envault import __version__
 from envault.audit import AuditLogger
 from envault.backup import backup_env_file, format_backup_list, list_backups, restore_backup
@@ -15,10 +21,6 @@ from envault.security_audit import SecurityAuditResult, audit_env_file, format_a
 from envault.serve import run_server
 from envault.stores import get_store
 from envault.sync import sync_env_files
-from pathlib import Path
-from rich.console import Console
-from rich.prompt import Confirm
-from rich.table import Table
 
 app = typer.Typer(
     name="envault",

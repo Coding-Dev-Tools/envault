@@ -10,11 +10,12 @@ Covers:
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from envault.audit import AuditLogger
 from envault.config import EnvaultConfig
 from envault.diff import _mask_value, diff_envs, format_diff
 from envault.rotate import rotate_env_var, rotate_value
-from pathlib import Path
 
 # ── audit.py: log() with optional fields ────────────────────────────────────
 

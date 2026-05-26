@@ -1,13 +1,15 @@
 """Tests for Envault CLI."""
 
+from pathlib import Path
+
 import pytest
+
 from envault import __version__
 from envault.audit import AuditLogger
 from envault.config import EnvaultConfig, init_config
 from envault.diff import diff_env_files, diff_envs, format_diff, load_env_file
 from envault.rotate import generate_secret, rotate_env_var, rotate_value
 from envault.sync import SyncConflict, sync_env_files, sync_envs, write_env_file
-from pathlib import Path
 
 # ── Version ─────────────────────────────────────────────────────────────────
 
@@ -443,6 +445,7 @@ class TestDopplerStore:
 
     def test_get_not_found(self):
         import responses
+
         from envault.stores import DopplerStore
         store = DopplerStore(project="test", config="dev", token="fake-token")
         url = "https://api.doppler.com/v3/configs/config/secrets"
@@ -453,6 +456,7 @@ class TestDopplerStore:
 
     def test_list_keys_empty(self):
         import responses
+
         from envault.stores import DopplerStore
         store = DopplerStore(project="test", config="dev", token="fake-token")
         url = "https://api.doppler.com/v3/configs/config/secrets"
@@ -463,6 +467,7 @@ class TestDopplerStore:
 
     def test_set_and_delete(self):
         import responses
+
         from envault.stores import DopplerStore
         store = DopplerStore(project="test", config="dev", token="fake-token")
         base = "https://api.doppler.com/v3/configs/config/secrets"
@@ -483,6 +488,7 @@ class TestOnePasswordStore:
 
     def test_get_not_found(self):
         import responses
+
         from envault.stores import OnePasswordStore
         store = OnePasswordStore(token="fake", vault_id="vault1")
         url = "http://localhost:8080/v1/vaults/vault1/items?filter=title%20eq%20%22K%22"
@@ -492,6 +498,7 @@ class TestOnePasswordStore:
 
     def test_list_keys_empty(self):
         import responses
+
         from envault.stores import OnePasswordStore
         store = OnePasswordStore(token="fake", vault_id="vault1")
         url = "http://localhost:8080/v1/vaults/vault1/items"
@@ -583,8 +590,9 @@ def test_local_store_list_keys_with_prefix(tmp_path):
 def test_cli_store_delete_ok(tmp_path):
     """store delete exits 0 and removes the key via config'd store."""
     import yaml
-    from envault.cli import app
     from typer.testing import CliRunner
+
+    from envault.cli import app
 
     # Create valid .envault.yml with a local store pointing at our env file
     env_file = tmp_path / ".env"
@@ -622,8 +630,9 @@ def test_cli_store_delete_ok(tmp_path):
 def test_cli_store_delete_not_found(tmp_path):
     """store delete exits 1 when key doesn't exist."""
     import yaml
-    from envault.cli import app
     from typer.testing import CliRunner
+
+    from envault.cli import app
 
     env_file = tmp_path / ".env"
     env_file.write_text("OTHER=value\n")
@@ -758,8 +767,9 @@ def test_decrypt_no_salt_fails(tmp_path):
 
 def test_cli_diff_identical(tmp_path):
     """diff exits 0 when files are identical."""
-    from envault.cli import app
     from typer.testing import CliRunner
+
+    from envault.cli import app
 
     env_a = tmp_path / "a.env"
     env_b = tmp_path / "b.env"
@@ -774,8 +784,9 @@ def test_cli_diff_identical(tmp_path):
 
 def test_cli_diff_different(tmp_path):
     """diff exits 0 by default when files differ (backward compat)."""
-    from envault.cli import app
     from typer.testing import CliRunner
+
+    from envault.cli import app
 
     env_a = tmp_path / "a.env"
     env_b = tmp_path / "b.env"
@@ -789,8 +800,9 @@ def test_cli_diff_different(tmp_path):
 
 def test_cli_diff_fail_on_missing_exits_1(tmp_path):
     """diff --fail-on-missing exits 1 when source has keys not in target."""
-    from envault.cli import app
     from typer.testing import CliRunner
+
+    from envault.cli import app
 
     env_a = tmp_path / "a.env"
     env_b = tmp_path / "b.env"
@@ -808,8 +820,9 @@ def test_cli_diff_fail_on_missing_exits_1(tmp_path):
 
 def test_cli_diff_fail_on_missing_exits_0_when_no_missing(tmp_path):
     """diff --fail-on-missing exits 0 when source has no missing keys in target."""
-    from envault.cli import app
     from typer.testing import CliRunner
+
+    from envault.cli import app
 
     env_a = tmp_path / "a.env"
     env_b = tmp_path / "b.env"
@@ -826,8 +839,9 @@ def test_cli_diff_fail_on_missing_exits_0_when_no_missing(tmp_path):
 
 def test_cli_diff_files_fail_on_missing(tmp_path):
     """diff-files --fail-on-missing exits 1 when source has keys not in target."""
-    from envault.cli import app
     from typer.testing import CliRunner
+
+    from envault.cli import app
 
     env_a = tmp_path / "a.env"
     env_b = tmp_path / "b.env"
@@ -845,8 +859,9 @@ def test_cli_diff_files_fail_on_missing(tmp_path):
 
 def test_cli_diff_files_fail_on_missing_ok(tmp_path):
     """diff-files --fail-on-missing exits 0 when all source keys exist in target."""
-    from envault.cli import app
     from typer.testing import CliRunner
+
+    from envault.cli import app
 
     env_a = tmp_path / "a.env"
     env_b = tmp_path / "b.env"
@@ -863,8 +878,9 @@ def test_cli_diff_files_fail_on_missing_ok(tmp_path):
 
 def test_cli_help():
     """CLI --help shows expected commands."""
-    from envault.cli import app
     from typer.testing import CliRunner
+
+    from envault.cli import app
 
     runner = CliRunner()
     result = runner.invoke(app, ["--help"])
@@ -881,8 +897,9 @@ def test_cli_help():
 
 def test_cli_version():
     """CLI version shows version string."""
-    from envault.cli import app
     from typer.testing import CliRunner
+
+    from envault.cli import app
 
     runner = CliRunner()
     result = runner.invoke(app, ["version"])
