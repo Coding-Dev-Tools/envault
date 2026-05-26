@@ -4,10 +4,8 @@ from __future__ import annotations
 
 import io
 import json
-from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
-import pytest
 
 from envault.config import EnvaultConfig
 from envault.serve import SecretHandler, create_handler
@@ -83,7 +81,7 @@ def _build_handler_instance(handler_class):
     instance._sent_body = None
 
     # Override _send_json to capture output instead of writing raw bytes
-    original_send_json = handler_class._send_json
+    handler_class._send_json  # verify attribute exists before patching
 
     def _capturing_send_json(self_inner, data, status=200):
         self_inner._sent_json = data

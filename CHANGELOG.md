@@ -4,6 +4,8 @@ All notable changes to Envault will be documented in this file.
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-05-26
+
 ### Added
 
 - CLI test suite with 19 tests covering version, help, init, diff, encrypt/decrypt, and sync (#22)
@@ -29,7 +31,7 @@ All notable changes to Envault will be documented in this file.
 - pyproject.toml dev dependencies formatting (trailing commas, ruff added)
 - `ruff` added to dev dependencies for CI lint step
 
-## v0.1.0
+## v0.1.0-pre
 
 - Initial release
 - Diff, sync, and rotate .env variables across environments
