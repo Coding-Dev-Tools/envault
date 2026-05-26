@@ -4,10 +4,13 @@ from __future__ import annotations
 
 import io
 import json
+from unittest.mock import MagicMock
+
+
 from envault.config import EnvaultConfig
 from envault.serve import SecretHandler, create_handler
 from envault.stores import LocalEnvStore
-from unittest.mock import MagicMock
+
 
 # ── Fixtures ───────────────────────────────────────────────────────────────────
 
@@ -78,7 +81,7 @@ def _build_handler_instance(handler_class):
     instance._sent_body = None
 
     # Override _send_json to capture output instead of writing raw bytes
-    _ = handler_class._send_json  # verify attribute exists before patching
+    handler_class._send_json  # verify attribute exists before patching
 
     def _capturing_send_json(self_inner, data, status=200):
         self_inner._sent_json = data
@@ -317,8 +320,8 @@ class TestServeCLI:
 
     def test_serve_help(self):
         """serve --help should show endpoint descriptions."""
-        from envault.cli import app
         from typer.testing import CliRunner
+        from envault.cli import app
 
         runner = CliRunner()
         result = runner.invoke(app, ["serve", "--help"])
@@ -329,8 +332,8 @@ class TestServeCLI:
     def test_serve_no_encrypt_key_exits(self, tmp_path):
         """serve without any encryption key should exit with error."""
         import os
-        from envault.cli import app
         from typer.testing import CliRunner
+        from envault.cli import app
 
         env_file = tmp_path / ".env"
         env_file.write_text("KEY=val\n")
