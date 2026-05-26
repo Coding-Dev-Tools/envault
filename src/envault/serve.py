@@ -10,14 +10,13 @@ from __future__ import annotations
 
 import json
 import os
-from http.server import HTTPServer, BaseHTTPRequestHandler
+from envault.config import EnvaultConfig
+from envault.encrypt import KEY_ENV_VAR
+from envault.stores import LocalEnvStore, SecretStore, get_store
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 from typing import Any
-from urllib.parse import urlparse, parse_qs
-
-from envault.config import EnvaultConfig, SecretStoreConfig
-from envault.encrypt import KEY_ENV_VAR
-from envault.stores import SecretStore, LocalEnvStore, get_store
+from urllib.parse import parse_qs, urlparse
 
 
 class SecretHandler(BaseHTTPRequestHandler):
