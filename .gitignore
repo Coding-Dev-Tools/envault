@@ -21,6 +21,7 @@ Thumbs.db
 
 # Envault
 .envault-audit.log
+.envault.salt
 .env.dev
 .env.staging
 .env.prod
