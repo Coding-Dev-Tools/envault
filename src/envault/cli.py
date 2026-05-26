@@ -9,6 +9,7 @@ from envault.config import EnvaultConfig, init_config
 from envault.diff import diff_env_files, format_diff
 from envault.encrypt import decrypt_env, encrypt_env
 from envault.rotate import rotate_env_var
+from envault.serve import run_server
 from envault.stores import get_store
 from envault.sync import sync_env_files
 from pathlib import Path
@@ -422,6 +423,32 @@ def audit(
         )
 
     console.print(table)
+
+
+# ── Serve (HTTP API) ──────────────────────────────────────────────────────────
+
+@app.command()
+def serve(
+    port: int = typer.Option(8080, "--port", "-p", help="Port to listen on"),
+    host: str = typer.Option("0.0.0.0", "--host", "-H", help="Bind address"),
+    password: str | None = typer.Option(None, "--password", "-k", help="Encryption password (prompted if omitted, or use ENVAULT_ENCRYPT_KEY)"),
+    store: str | None = typer.Option(None, "--store", "-s", help="Named store from config to use"),
+    config_path: str = typer.Option("", "--config", "-c", help="Config file path"),
+):
+    """Start an HTTP server that exposes decrypted secrets as a JSON API.
+
+    Endpoints:
+
+    GET /secrets — list all secret keys
+
+    GET /secrets?prefix=X — filter keys by prefix
+
+    GET /secrets/{key} — get decrypted value for a key
+
+    GET /health — store connectivity check
+    """
+    config = load_config(config_path)
+    run_server(config, port=port, host=host, encrypt_key=password, store_name=store)
 
 
 # ── Version ─────────────────────────────────────────────────────────────────
