@@ -401,8 +401,8 @@ def test_init_example_sorted_keys(runner: CliRunner, tmp_path):
     ])
     assert result.exit_code == 0
 
-    lines = [l for l in example_path.read_text().splitlines() if l and not l.startswith("#")]
-    keys = [l.split("=")[0] for l in lines]
+    lines = [line for line in example_path.read_text().splitlines() if line and not line.startswith("#")]
+    keys = [line.split("=")[0] for line in lines]
     assert keys == sorted(keys)
 
 

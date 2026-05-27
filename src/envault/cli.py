@@ -97,7 +97,7 @@ def diff(
             label_s, label_t = source_env, target_env
     except FileNotFoundError as e:
         err_console.print(f"[red]Error:[/red] {e}")
-        raise typer.Exit(code=1)
+        raise typer.Exit(code=1) from None
 
     console.print(format_diff(result, label_s, label_t))
 
@@ -121,7 +121,7 @@ def diff_files(
         result = diff_env_files(file1, file2)
     except FileNotFoundError as e:
         err_console.print(f"[red]Error:[/red] {e}")
-        raise typer.Exit(code=1)
+        raise typer.Exit(code=1) from None
     console.print(format_diff(result, Path(file1).name, Path(file2).name))
     if result.has_differences:
         console.print(f"\nTotal: {result.total_differences} difference(s)")
