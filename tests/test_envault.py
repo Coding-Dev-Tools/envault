@@ -148,8 +148,8 @@ def test_load_env_file(tmp_path):
 
 
 def test_load_env_file_not_exists(tmp_path):
-    result = load_env_file(tmp_path / ".nonexistent")
-    assert result == {}
+    with pytest.raises(FileNotFoundError):
+        load_env_file(tmp_path / ".nonexistent")
 
 
 def test_load_env_content():

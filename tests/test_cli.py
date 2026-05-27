@@ -153,11 +153,10 @@ def test_diff_files_different(runner: CliRunner, tmp_path):
 
 
 def test_diff_files_not_found(runner: CliRunner, tmp_path):
-    """diff-files on non-existent files should complete gracefully (empty files treated as no content)."""
+    """diff-files on non-existent files should error with a clear message."""
     result = runner.invoke(app, ["diff-files", str(tmp_path / "nope1.env"), str(tmp_path / "nope2.env")])
-    # Non-existent files are treated as empty — they're identical
-    assert result.exit_code == 0
-    assert "identical" in result.stdout.lower()
+    assert result.exit_code == 1
+    assert "not found" in result.output.lower() or "error" in result.output.lower()
 
 
 # ── Encrypt / Decrypt ───────────────────────────────────────────────────────

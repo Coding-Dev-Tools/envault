@@ -11,7 +11,7 @@ def load_env_file(path: str | Path) -> dict[str, str]:
     """Load a .env file, returning a dict of key-value pairs."""
     path = Path(path)
     if not path.exists():
-        return {}
+        raise FileNotFoundError(f"Env file not found: {path}")
     return {k: v for k, v in dotenv_values(path).items() if k is not None and v is not None}
 
 

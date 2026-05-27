@@ -86,14 +86,18 @@ def diff(
     """Diff environment variables between two environments or .env files."""
     config = load_config(config_path)
 
-    if source_file and target_file:
-        result = diff_env_files(source_file, target_file)
-        label_s, label_t = Path(source_file).name, Path(target_file).name
-    else:
-        src_path = source_file or config.get_env_path(source_env)
-        tgt_path = target_file or config.get_env_path(target_env)
-        result = diff_env_files(src_path, tgt_path)
-        label_s, label_t = source_env, target_env
+    try:
+        if source_file and target_file:
+            result = diff_env_files(source_file, target_file)
+            label_s, label_t = Path(source_file).name, Path(target_file).name
+        else:
+            src_path = source_file or config.get_env_path(source_env)
+            tgt_path = target_file or config.get_env_path(target_env)
+            result = diff_env_files(src_path, tgt_path)
+            label_s, label_t = source_env, target_env
+    except FileNotFoundError as e:
+        err_console.print(f"[red]Error:[/red] {e}")
+        raise typer.Exit(code=1)
 
     console.print(format_diff(result, label_s, label_t))
 
@@ -113,7 +117,11 @@ def diff_files(
     fail_on_missing: bool = typer.Option(False, "--fail-on-missing", help="Exit with code 1 if source has keys not in target"),
 ):
     """Diff two .env files directly (no config needed)."""
-    result = diff_env_files(file1, file2)
+    try:
+        result = diff_env_files(file1, file2)
+    except FileNotFoundError as e:
+        err_console.print(f"[red]Error:[/red] {e}")
+        raise typer.Exit(code=1)
     console.print(format_diff(result, Path(file1).name, Path(file2).name))
     if result.has_differences:
         console.print(f"\nTotal: {result.total_differences} difference(s)")
