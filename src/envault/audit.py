@@ -68,7 +68,7 @@ class AuditLogger:
 
         return entries[-limit:]
 
-    def clear(self):
+    def clear(self) -> None:
         """Clear the audit log."""
         path = Path(self.log_path)
         if path.exists():

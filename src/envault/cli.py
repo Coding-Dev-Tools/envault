@@ -719,7 +719,7 @@ def serve(
 # ── Version ─────────────────────────────────────────────────────────────────
 
 @app.command()
-def version():
+def version() -> None:
     """Show version."""
     console.print(f"envault v{__version__}")
 

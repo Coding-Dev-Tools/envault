@@ -57,7 +57,7 @@ class EnvaultConfig(BaseModel):
 
         return cls.model_validate(raw)
 
-    def save(self, path: str | Path = ".envault.yml"):
+    def save(self, path: str | Path = ".envault.yml") -> None:
         """Save config to a .envault.yml file."""
         path = Path(path)
         with open(path, "w") as f:
