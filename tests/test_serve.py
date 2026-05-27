@@ -36,14 +36,14 @@ class _FakeStore:
         return keys
 
 
-def _make_handler(store, config: EnvaultConfig | None = None):
+def _make_handler(store, config: EnvaultConfig | None = None, api_token: str | None = None):
     """Create a handler class bound to the given store and return a mock instance.
 
     We create a mock request handler that has the routing logic from
     SecretHandler but uses pre-set wfile/rfile so we can inspect output.
     """
     config = config or EnvaultConfig()
-    handler_class = create_handler(store, config, encrypt_key="test-key")
+    handler_class = create_handler(store, config, encrypt_key="test-key", api_token=api_token)
 
     # Build a minimal instance that has enough of BaseHTTPRequestHandler
     # wired up to test do_GET routing and response writing.
@@ -71,6 +71,9 @@ def _build_handler_instance(handler_class):
     instance.server = MagicMock()
     instance.command = "GET"
     instance.request_version = "HTTP/1.1"
+
+    # Mock headers dict for auth checks
+    instance.headers = {}
 
     # Track what _send_json writes so we can assert on it
     instance._sent_json = None
@@ -176,7 +179,7 @@ class TestSecretsGet:
         store = _FakeStore({"KEY": "val"})
         handler = _make_handler(store)
         # Path with explicitly empty key after /secrets/
-        # Note: /secrets/ gets rstrip("/") → /secrets → list endpoint
+        # Note: /secrets/ gets rstrip("/") -> /secrets -> list endpoint
         # To test the 400, we need a key that resolves to empty after routing
         # The handler checks startswith("/secrets/") then extracts key
         # A URL-decoded empty key won't happen in practice, but we test
@@ -272,7 +275,7 @@ class TestRouting:
         handler.path = "/secrets/"
         handler.do_GET()
 
-        # /secrets/ with trailing slash → after rstrip("/") becomes "/secrets"
+        # /secrets/ with trailing slash -> after rstrip("/") becomes "/secrets"
         # which routes to the list endpoint
         assert handler._sent_status == 200
         assert "keys" in handler._sent_json
@@ -355,3 +358,84 @@ class TestServeCLI:
         finally:
             if old is not None:
                 os.environ["ENVAULT_ENCRYPT_KEY"] = old
+
+
+# ── Tests: Bearer token authentication ─────────────────────────────────────────
+
+
+class TestBearerAuth:
+    """Tests for Bearer token authentication on the secrets API."""
+
+    def test_no_token_allows_access(self):
+        """Without api_token configured, all endpoints are accessible."""
+        store = _FakeStore({"SECRET": "value"})
+        handler = _make_handler(store, api_token=None)
+        handler.path = "/secrets"
+        handler.do_GET()
+
+        assert handler._sent_status == 200
+        assert handler._sent_json["keys"] == ["SECRET"]
+
+    def test_valid_token_allows_access(self):
+        """Correct Bearer token should allow access to /secrets."""
+        store = _FakeStore({"SECRET": "value"})
+        handler = _make_handler(store, api_token="my-secret-token")
+        handler.headers = {"Authorization": "Bearer my-secret-token"}
+        handler.path = "/secrets"
+        handler.do_GET()
+
+        assert handler._sent_status == 200
+        assert handler._sent_json["keys"] == ["SECRET"]
+
+    def test_missing_auth_header_returns_401(self):
+        """Missing Authorization header should return 401."""
+        store = _FakeStore({"SECRET": "value"})
+        handler = _make_handler(store, api_token="my-secret-token")
+        handler.headers = {}
+        handler.path = "/secrets"
+        handler.do_GET()
+
+        assert handler._sent_status == 401
+        assert "bearer" in handler._sent_json["error"].lower()
+
+    def test_wrong_scheme_returns_401(self):
+        """Non-Bearer auth scheme should return 401."""
+        store = _FakeStore({"SECRET": "value"})
+        handler = _make_handler(store, api_token="my-secret-token")
+        handler.headers = {"Authorization": "Basic dXNlcjpwYXNz"}
+        handler.path = "/secrets"
+        handler.do_GET()
+
+        assert handler._sent_status == 401
+
+    def test_wrong_token_returns_403(self):
+        """Wrong Bearer token should return 403."""
+        store = _FakeStore({"SECRET": "value"})
+        handler = _make_handler(store, api_token="my-secret-token")
+        handler.headers = {"Authorization": "Bearer wrong-token"}
+        handler.path = "/secrets"
+        handler.do_GET()
+
+        assert handler._sent_status == 403
+        assert "invalid" in handler._sent_json["error"].lower()
+
+    def test_health_endpoint_no_auth_required(self):
+        """Health endpoint should be accessible without auth even when token is set."""
+        store = _FakeStore({"K": "v"})
+        handler = _make_handler(store, api_token="my-secret-token")
+        handler.headers = {}
+        handler.path = "/health"
+        handler.do_GET()
+
+        assert handler._sent_status == 200
+        assert handler._sent_json["status"] == "ok"
+
+    def test_auth_protects_secrets_key_endpoint(self):
+        """GET /secrets/{key} should also require auth."""
+        store = _FakeStore({"SECRET": "value"})
+        handler = _make_handler(store, api_token="my-secret-token")
+        handler.headers = {}
+        handler.path = "/secrets/SECRET"
+        handler.do_GET()
+
+        assert handler._sent_status == 401

@@ -456,25 +456,26 @@ def audit(
 @app.command()
 def serve(
     port: int = typer.Option(8080, "--port", "-p", help="Port to listen on"),
-    host: str = typer.Option("0.0.0.0", "--host", "-H", help="Bind address"),
+    host: str = typer.Option("127.0.0.1", "--host", "-H", help="Bind address (default: localhost only)"),
     password: str | None = typer.Option(None, "--password", "-k", help="Encryption password (prompted if omitted, or use ENVAULT_ENCRYPT_KEY)"),
     store: str | None = typer.Option(None, "--store", "-s", help="Named store from config to use"),
     config_path: str = typer.Option("", "--config", "-c", help="Config file path"),
+    api_token: str | None = typer.Option(None, "--api-token", "-t", help="Bearer token for API auth (or set ENVAULT_API_TOKEN)"),
 ):
     """Start an HTTP server that exposes decrypted secrets as a JSON API.
 
     Endpoints:
 
-    GET /secrets — list all secret keys
+    GET /secrets — list all secret keys (requires Bearer token if --api-token set)
 
     GET /secrets?prefix=X — filter keys by prefix
 
     GET /secrets/{key} — get decrypted value for a key
 
-    GET /health — store connectivity check
+    GET /health — store connectivity check (no auth required)
     """
     config = load_config(config_path)
-    run_server(config, port=port, host=host, encrypt_key=password, store_name=store)
+    run_server(config, port=port, host=host, encrypt_key=password, store_name=store, api_token=api_token)
 
 
 # ── Version ─────────────────────────────────────────────────────────────────

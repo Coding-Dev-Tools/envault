@@ -26,6 +26,7 @@ class SecretHandler(BaseHTTPRequestHandler):
     store: SecretStore
     config: EnvaultConfig
     encrypt_key: str | None
+    api_token: str | None
 
     # ── Helpers ──────────────────────────────────────────────────────────────
 
@@ -42,16 +43,47 @@ class SecretHandler(BaseHTTPRequestHandler):
         """Send a JSON error payload."""
         self._send_json({"error": message}, status=status)
 
+    # ── Auth ─────────────────────────────────────────────────────────────────
+
+    def _check_auth(self) -> bool:
+        """Verify Bearer token if api_token is configured.
+
+        Returns True if the request is authenticated (or auth is disabled).
+        Sends a 401 and returns False if authentication fails.
+        """
+        if not self.api_token:
+            # No token configured — auth not required
+            return True
+
+        auth_header = self.headers.get("Authorization", "")
+        if not auth_header.startswith("Bearer "):
+            self._send_error(401, "Unauthorized: Bearer token required")
+            return False
+
+        token = auth_header[len("Bearer "):]
+        if token != self.api_token:
+            self._send_error(403, "Forbidden: invalid token")
+            return False
+
+        return True
+
     # ── Routing ──────────────────────────────────────────────────────────────
 
-    def do_GET(self) -> None:  # noqa: N802 – stdlib naming convention
+    def do_GET(self) -> None: # noqa: N802 – stdlib naming convention
         parsed = urlparse(self.path)
         path = parsed.path.rstrip("/") or "/"
         query = parse_qs(parsed.query)
 
+        # Health endpoint is always accessible (useful for load balancers)
         if path == "/health":
             self._handle_health()
-        elif path == "/secrets":
+            return
+
+        # All other endpoints require auth
+        if not self._check_auth():
+            return
+
+        if path == "/secrets":
             self._handle_secrets_list(query)
         elif path.startswith("/secrets/"):
             key = path[len("/secrets/"):]
@@ -130,7 +162,7 @@ def _get_encrypt_key() -> str | None:
         return None
 
 
-def create_handler(store: SecretStore, config: EnvaultConfig, encrypt_key: str | None = None):
+def create_handler(store: SecretStore, config: EnvaultConfig, encrypt_key: str | None = None, api_token: str | None = None):
     """Return a BaseHTTPRequestHandler subclass bound to the given store/config.
 
     This avoids mutating the class-level attributes on SecretHandler directly,
@@ -140,18 +172,20 @@ def create_handler(store: SecretStore, config: EnvaultConfig, encrypt_key: str |
     class _Handler(SecretHandler):
         pass
 
-    _Handler.store = store  # type: ignore[attr-defined]
-    _Handler.config = config  # type: ignore[attr-defined]
-    _Handler.encrypt_key = encrypt_key  # type: ignore[attr-defined]
+    _Handler.store = store # type: ignore[attr-defined]
+    _Handler.config = config # type: ignore[attr-defined]
+    _Handler.encrypt_key = encrypt_key # type: ignore[attr-defined]
+    _Handler.api_token = api_token # type: ignore[attr-defined]
     return _Handler
 
 
 def run_server(
     config: EnvaultConfig,
     port: int = 8080,
-    host: str = "0.0.0.0",
+    host: str = "127.0.0.1",
     encrypt_key: str | None = None,
     store_name: str | None = None,
+    api_token: str | None = None,
 ) -> None:
     """Start the HTTP server for the secrets API.
 
@@ -162,12 +196,16 @@ def run_server(
     port : int
         Port to bind (default 8080).
     host : str
-        Bind address (default "0.0.0.0").
+        Bind address (default "127.0.0.1" — localhost only for security).
     encrypt_key : str | None
         Encryption key; if *None* the key is read from ENVAULT_ENCRYPT_KEY or
         prompted interactively.
     store_name : str | None
         Named store from config to use; if *None* the default store is used.
+    api_token : str | None
+        Bearer token for API authentication. If *None*, reads from
+        ENVAULT_API_TOKEN env var. If still unset, API auth is disabled
+        with a warning (only safe on localhost).
     """
 
     # Resolve encryption key (same auth model as decrypt command)
@@ -175,6 +213,15 @@ def run_server(
         encrypt_key = _get_encrypt_key()
     if not encrypt_key:
         raise SystemExit("Error: encryption key required (set ENVAULT_ENCRYPT_KEY or provide --password)")
+
+    # Resolve API token for Bearer auth
+    if api_token is None:
+        api_token = os.environ.get("ENVAULT_API_TOKEN")
+    if not api_token and host not in ("127.0.0.1", "localhost"):
+        raise SystemExit(
+            "Error: API token required when binding to non-localhost address. "
+            "Set ENVAULT_API_TOKEN or pass --api-token."
+        )
 
     # Build the store instance
     if store_name and store_name in config.stores:
@@ -186,16 +233,20 @@ def run_server(
     else:
         store_instance = get_store("")
 
-    handler_class = create_handler(store_instance, config, encrypt_key)
+    handler_class = create_handler(store_instance, config, encrypt_key, api_token=api_token)
     server = HTTPServer((host, port), handler_class)
 
     from rich.console import Console
     console = Console()
     console.print(f"[green]✓[/green] envault serve listening on http://{host}:{port}")
-    console.print("  GET /secrets           — list all secret keys")
-    console.print("  GET /secrets?prefix=X  — filter keys by prefix")
-    console.print("  GET /secrets/{key}     — get decrypted value")
-    console.print("  GET /health            — store connectivity check")
+    console.print(" GET /secrets — list all secret keys")
+    console.print(" GET /secrets?prefix=X — filter keys by prefix")
+    console.print(" GET /secrets/{key} — get decrypted value")
+    console.print(" GET /health — store connectivity check")
+    if api_token:
+        console.print("[green]🔒[/green] API authentication enabled (Bearer token)")
+    else:
+        console.print("[yellow]⚠[/yellow] No API token set — secrets accessible without auth (localhost only)")
     console.print("[dim]Press Ctrl+C to stop[/dim]")
 
     try:
