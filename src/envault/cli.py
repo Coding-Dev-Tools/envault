@@ -51,7 +51,7 @@ def init(
     """
     # Before overwriting config, collect env file paths from any existing config
     # so _generate_env_example can scan them for keys.
-    existing_env_files: list[str] = []
+    existing_env_files: list[str | Path] = []
     if Path(config_path).exists():
         existing_config = EnvaultConfig.load(config_path)
         existing_env_files = [e.env_file for e in existing_config.environments]

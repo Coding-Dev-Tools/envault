@@ -24,7 +24,7 @@ class AuditLogger:
         details: dict | None = None,
     ):
         """Log an audit entry."""
-        entry = {
+        entry: dict[str, object] = {
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "action": action,
             "key": key,
