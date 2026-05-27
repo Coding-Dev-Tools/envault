@@ -78,8 +78,71 @@ class EnvaultConfig(BaseModel):
         return self.stores.get(name)
 
 
-def init_config(project_name: str, path: str | Path = ".envault.yml") -> EnvaultConfig:
-    """Initialize a new .envault.yml config file."""
+def init_config(
+    project_name: str,
+    path: str | Path = ".envault.yml",
+    generate_example: bool = True,
+    example_path: str | Path = ".env.example",
+    env_files: list[str | Path] | None = None,
+) -> EnvaultConfig:
+    """Initialize a new .envault.yml config file.
+
+    If generate_example is True, also creates a .env.example file
+    containing all keys found in existing .env files with blank values.
+    """
     config = EnvaultConfig(project=project_name)
     config.save(path)
+
+    if generate_example:
+        _generate_env_example(config, example_path, env_files)
+
     return config
+
+
+def _generate_env_example(
+    config: EnvaultConfig,
+    example_path: str | Path = ".env.example",
+    extra_env_files: list[str | Path] | None = None,
+) -> Path:
+    """Generate a .env.example file with keys and blank values.
+
+    Scans all .env files referenced in the config (plus any extra paths),
+    collects every key, and writes them with empty values to example_path.
+    """
+    from envault.diff import load_env_file
+
+    all_keys: set[str] = set()
+
+    # Collect keys from config-referenced env files
+    for env_cfg in config.environments:
+        env_path = Path(env_cfg.env_file)
+        if env_path.exists():
+            vars = load_env_file(env_path)
+            all_keys.update(vars.keys())
+
+    # Collect keys from any extra .env files (e.g. .env itself)
+    if extra_env_files:
+        for fp in extra_env_files:
+            p = Path(fp)
+            if p.exists():
+                vars = load_env_file(p)
+                all_keys.update(vars.keys())
+
+    # Also scan .env in CWD if not already covered
+    default_env = Path(".env")
+    if default_env.exists():
+        vars = load_env_file(default_env)
+        all_keys.update(vars.keys())
+
+    example_path = Path(example_path)
+
+    if not all_keys:
+        # No keys found — don't create an empty example file
+        return example_path
+
+    with open(example_path, "w") as f:
+        f.write("# Environment variable template — copy to .env and fill in values\n")
+        for key in sorted(all_keys):
+            f.write(f"{key}=\n")
+
+    return example_path

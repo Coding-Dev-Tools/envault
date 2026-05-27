@@ -38,11 +38,37 @@ def load_config(config_path: str = "") -> EnvaultConfig:
 def init(
     project_name: str = typer.Argument(..., help="Project name"),
     config_path: str = typer.Option(".envault.yml", "--config", "-c", help="Config file path"),
+    no_example: bool = typer.Option(False, "--no-example", help="Skip .env.example generation"),
+    example_file: str = typer.Option(".env.example", "--example-file", "-e", help="Output path for .env.example"),
 ):
-    """Initialize a new .envault.yml config file."""
-    init_config(project_name, config_path)
+    """Initialize a new .envault.yml config file and generate .env.example.
+
+    Scans existing .env files for keys and creates a .env.example with
+    all keys but blank values — safe to commit to version control.
+    """
+    # Before overwriting config, collect env file paths from any existing config
+    # so _generate_env_example can scan them for keys.
+    existing_env_files: list[str] = []
+    if Path(config_path).exists():
+        existing_config = EnvaultConfig.load(config_path)
+        existing_env_files = [e.env_file for e in existing_config.environments]
+
+    init_config(
+        project_name,
+        config_path,
+        generate_example=not no_example,
+        example_path=example_file,
+        env_files=existing_env_files if existing_env_files else None,
+    )
     console.print(f"[green]✓[/green] Created {config_path} for project '{project_name}'")
-    console.print("\nEdit the file to configure environments and secret stores.")
+    if not no_example:
+        example_path = Path(example_file)
+        if example_path.exists():
+            key_count = sum(1 for line in example_path.read_text().splitlines() if line and not line.startswith("#"))
+            console.print(f"[green]✓[/green] Generated {example_file} ({key_count} keys)")
+        else:
+            console.print(f"[yellow]⚠[/yellow] No .env files found — {example_file} not created")
+    console.print("\nEdit the config to set up environments and secret stores.")
     console.print("Then run: envault diff, envault sync, envault rotate")
 
 

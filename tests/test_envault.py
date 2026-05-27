@@ -46,6 +46,40 @@ def test_init_config(tmp_path):
     assert path.exists()
 
 
+def test_init_config_with_example(tmp_path):
+    """init_config should generate .env.example from existing env files."""
+    env_dev = tmp_path / ".env.dev"
+    env_dev.write_text("DB_HOST=localhost\nAPI_KEY=secret123\n")
+    example_path = tmp_path / ".env.example"
+
+    init_config(
+        "test",
+        str(tmp_path / ".envault.yml"),
+        generate_example=True,
+        example_path=str(example_path),
+        env_files=[str(env_dev)],
+    )
+    assert example_path.exists()
+    content = example_path.read_text()
+    assert "DB_HOST=" in content
+    assert "API_KEY=" in content
+    # Values should be blank
+    for line in content.splitlines():
+        if line and not line.startswith("#"):
+            key, _, value = line.partition("=")
+            assert value == ""
+
+
+def test_init_config_no_example(tmp_path):
+    """init_config with generate_example=False should skip .env.example."""
+    path = tmp_path / ".envault.yml"
+    example_path = tmp_path / ".env.example"
+    config = init_config("my-project", str(path), generate_example=False, example_path=str(example_path))
+    assert config.project == "my-project"
+    assert path.exists()
+    assert not example_path.exists()
+
+
 def test_config_get_env_path(tmp_path):
     config = EnvaultConfig()
     config.environments[0].env_file = ".env.custom"

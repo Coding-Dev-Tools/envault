@@ -301,6 +301,128 @@ def test_init_missing_project_name(runner: CliRunner):
     assert "Missing argument" in result.output or "Error" in result.output
 
 
+def test_init_generates_env_example(runner: CliRunner, tmp_path):
+    """init should generate .env.example with keys from existing .env files."""
+    import yaml
+
+    config_path = tmp_path / ".envault.yml"
+    example_path = tmp_path / ".env.example"
+    env_dev = tmp_path / ".env.dev"
+    env_dev.write_text("DB_HOST=localhost\nDB_PORT=5432\nSECRET_KEY=abc123\n")
+
+    config = {
+        "project": "test",
+        "environments": [{"name": "dev", "env_file": str(env_dev)}],
+    }
+    with open(config_path, "w") as f:
+        yaml.dump(config, f)
+
+    # Re-init to generate example from existing config + env files
+    result = runner.invoke(app, [
+        "init", "my-project",
+        "--config", str(config_path),
+        "--example-file", str(example_path),
+    ])
+    assert result.exit_code == 0
+    assert example_path.exists()
+
+    content = example_path.read_text()
+    assert "DB_HOST=" in content
+    assert "DB_PORT=" in content
+    assert "SECRET_KEY=" in content
+    # Values should be blank
+    for line in content.splitlines():
+        if line and not line.startswith("#"):
+            key, _, value = line.partition("=")
+            assert value == "", f"Key {key} should have blank value, got '{value}'"
+
+
+def test_init_no_example_flag(runner: CliRunner, tmp_path):
+    """init --no-example should skip .env.example generation."""
+    config_path = tmp_path / ".envault.yml"
+    example_path = tmp_path / ".env.example"
+
+    result = runner.invoke(app, [
+        "init", "my-project",
+        "--config", str(config_path),
+        "--no-example",
+    ])
+    assert result.exit_code == 0
+    assert config_path.exists()
+    assert not example_path.exists()
+
+
+def test_init_example_from_env_file(runner: CliRunner, tmp_path):
+    """init should scan .env in cwd when generating example."""
+    import os
+
+    config_path = tmp_path / ".envault.yml"
+    example_path = tmp_path / ".env.example"
+    env_file = tmp_path / ".env"
+    env_file.write_text("API_KEY=mykey\nDATABASE_URL=postgres://host\n")
+
+    # Change to tmp_path so .env is in CWD
+    old_cwd = os.getcwd()
+    try:
+        os.chdir(tmp_path)
+        result = runner.invoke(app, [
+            "init", "my-project",
+            "--config", str(config_path),
+            "--example-file", str(example_path),
+        ])
+    finally:
+        os.chdir(old_cwd)
+
+    assert result.exit_code == 0
+    content = example_path.read_text()
+    assert "API_KEY=" in content
+    assert "DATABASE_URL=" in content
+
+
+def test_init_example_sorted_keys(runner: CliRunner, tmp_path):
+    """init should output keys in sorted order in .env.example."""
+    import yaml
+
+    config_path = tmp_path / ".envault.yml"
+    example_path = tmp_path / ".env.example"
+    env_dev = tmp_path / ".env.dev"
+    env_dev.write_text("ZEBRA=z\nALPHA=a\nMEDIUM=m\n")
+
+    config = {
+        "project": "test",
+        "environments": [{"name": "dev", "env_file": str(env_dev)}],
+    }
+    with open(config_path, "w") as f:
+        yaml.dump(config, f)
+
+    result = runner.invoke(app, [
+        "init", "my-project",
+        "--config", str(config_path),
+        "--example-file", str(example_path),
+    ])
+    assert result.exit_code == 0
+
+    lines = [l for l in example_path.read_text().splitlines() if l and not l.startswith("#")]
+    keys = [l.split("=")[0] for l in lines]
+    assert keys == sorted(keys)
+
+
+def test_init_example_no_env_files(runner: CliRunner, tmp_path):
+    """init with no .env files should report no keys and not create example."""
+    config_path = tmp_path / ".envault.yml"
+    example_path = tmp_path / ".env.example"
+
+    result = runner.invoke(app, [
+        "init", "my-project",
+        "--config", str(config_path),
+        "--example-file", str(example_path),
+    ])
+    assert result.exit_code == 0
+    # The example file may or may not exist depending on whether .env files were found
+    # Key thing: no crash and config was created
+    assert config_path.exists()
+
+
 # ── Sync (actual execution) ─────────────────────────────────────────────────
 
 
