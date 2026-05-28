@@ -117,6 +117,45 @@ rh-envault audit --key DB_PASSWORD
 rh-envault audit --action rotate --limit 100
 ```
 
+### `rh-envault serve`
+
+Start an HTTP server that exposes decrypted secrets as a JSON API — ideal for MCP server sidecars, CI/CD pipelines, and AI agent runtimes.
+
+```bash
+# Start the secrets API on port 8080 (default)
+rh-envault serve
+
+# Custom port, host, and API key
+rh-envault serve --port 3000 --host 0.0.0.0 --api-key my-bearer-token
+
+# Use a named store from config
+rh-envault serve --store production-secrets
+```
+
+**Endpoints:**
+
+| Endpoint | Auth | Description |
+|----------|------|-------------|
+| `GET /health` | No | Store connectivity check |
+| `GET /secrets` | Yes | List all secret keys (filter with `?prefix=X`) |
+| `GET /secrets/{key}` | Yes | Get decrypted value for a key |
+
+**Security:**
+- Defaults to `127.0.0.1` (localhost only) — use `--host 0.0.0.0` only behind a firewall or reverse proxy
+- Set `--api-key` or `ENVAULT_API_KEY` env var to require Bearer token auth on `/secrets` endpoints
+- No built-in TLS — run behind a reverse proxy (nginx, Caddy) for HTTPS in production
+
+```bash
+# Fetch secrets with curl
+curl -H "Authorization: Bearer my-token" http://localhost:8080/secrets
+
+# Filter by prefix
+curl -H "Authorization: Bearer my-token" "http://localhost:8080/secrets?prefix=STRIPE"
+
+# Get a specific secret
+curl -H "Authorization: Bearer my-token" http://localhost:8080/secrets/DB_PASSWORD
+```
+
 ## Features
 
 - **Environment diffing** — compare variables between any two environments with colorized output
@@ -124,6 +163,7 @@ rh-envault audit --action rotate --limit 100
 - **Smart secret rotation** — auto-detects secret type (DB password, API key, JWT, webhook) and generates appropriate values
 - **Bulk rotation** — `rotate-all` with per-key dry-run preview
 - **Secret store integration** — AWS SSM, HashiCorp Vault, Doppler, 1Password
+- **Secrets HTTP API** — `serve` exposes decrypted secrets over HTTP with Bearer token auth for MCP sidecars, CI/CD, and agent runtimes
 - **Audit trail** — every operation logged to `.envault-audit.log` with queryable CLI
 - **Configuration as code** — `.envault.yml` is team-shareable and Git-friendly
 
@@ -228,7 +268,7 @@ Configuration and audit logs are stored in the project root and `~/.envault/`:
 - [ ] Interactive merge for conflict resolution
 - [ ] Vault OIDC auth
 - [ ] GitOps mode — sync from Git-based config repos
-- [ ] MCP server for AI-assisted env management
+- [x] ~~MCP server for AI-assisted env management~~ → `envault serve` (HTTP API, see above)
 - [ ] Docker-based CLI image
 - [ ] Terraform provider for secret provisioning
 
