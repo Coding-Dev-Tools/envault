@@ -1,6 +1,6 @@
 {
   "name": "rh-envault",
-  "version": "3.1.3",
+  "version": "0.1.0",
   "description": "Secure environment variable manager for development teams. Encrypt, store, and share .env files.",
   "author": "Revenue Holdings <engineering@revenueholdings.dev>",
   "license": "MIT",
