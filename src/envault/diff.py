@@ -50,6 +50,43 @@ class EnvDiffResult:
     def has_differences(self) -> bool:
         return self.total_differences > 0
 
+    def to_dict(
+        self,
+        source_label: str = "source",
+        target_label: str = "target",
+        mask_secrets: bool = True,
+    ) -> dict:
+        """Return a JSON-serializable dict of the diff result.
+
+        Args:
+            source_label: Label for the source environment.
+            target_label: Label for the target environment.
+            mask_secrets: If True, long values are masked heuristically.
+        """
+        mask = _mask_value if mask_secrets else lambda v, **kw: v
+
+        only_in_source = {k: mask(v) for k, v in sorted(self.only_in_source.items())}
+        only_in_target = {k: mask(v) for k, v in sorted(self.only_in_target.items())}
+        different = {
+            k: {
+                source_label: mask(s),
+                target_label: mask(t),
+            }
+            for k, (s, t) in sorted(self.different.items())
+        }
+        common_keys = sorted(self.common.keys())
+
+        return {
+            "has_differences": self.has_differences,
+            "total_differences": self.total_differences,
+            "only_in_source": only_in_source,
+            "only_in_target": only_in_target,
+            "different": different,
+            "common_keys": common_keys,
+            "source_label": source_label,
+            "target_label": target_label,
+        }
+
 
 def diff_envs(
     source: dict[str, str],
@@ -130,6 +167,24 @@ def format_diff(
         lines.append(f"\n--- Unchanged ({len(result.common)} keys)")
 
     return "\n".join(lines)
+
+
+def format_diff_json(
+    result: EnvDiffResult,
+    source_label: str = "source",
+    target_label: str = "target",
+    mask_secrets: bool = True,
+    indent: int = 2,
+) -> str:
+    """Format a diff result as a JSON string for programmatic use."""
+    import json
+
+    data = result.to_dict(
+        source_label=source_label,
+        target_label=target_label,
+        mask_secrets=mask_secrets,
+    )
+    return json.dumps(data, indent=indent)
 
 
 def _mask_value(value: str, max_show: int = 8) -> str:

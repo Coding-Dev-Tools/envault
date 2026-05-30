@@ -4,7 +4,7 @@ import pytest
 from envault import __version__
 from envault.audit import AuditLogger
 from envault.config import EnvaultConfig, init_config
-from envault.diff import diff_env_files, diff_envs, format_diff, load_env_file
+from envault.diff import diff_env_files, diff_envs, format_diff, format_diff_json, load_env_file
 from envault.rotate import generate_secret, rotate_env_var, rotate_value
 from envault.sync import SyncConflict, sync_env_files, sync_envs, write_env_file
 from pathlib import Path
@@ -165,10 +165,59 @@ def test_format_diff_identical():
     assert "identical" in output
 
 
+
+
 def test_format_diff_different():
     result = diff_envs({"A": "1", "B": "2"}, {"A": "x", "C": "3"})
     output = format_diff(result)
     assert "Only in source" in output or "Differing" in output or "Only in target" in output
+
+
+
+# ── Diff JSON output ───────────────────────────────────────────────────────
+
+
+def test_diff_to_dict_identical():
+    result = diff_envs({"A": "1"}, {"A": "1"})
+    d = result.to_dict()
+    assert d["has_differences"] is False
+    assert d["total_differences"] == 0
+    assert d["only_in_source"] == {}
+    assert d["only_in_target"] == {}
+    assert d["different"] == {}
+    assert "A" in d["common_keys"]
+
+
+def test_diff_to_dict_with_differences():
+    result = diff_envs({"A": "1", "B": "2"}, {"A": "x", "C": "3"})
+    d = result.to_dict(source_label="dev", target_label="prod")
+    assert d["has_differences"] is True
+    assert d["total_differences"] == 3
+    assert d["only_in_source"] == {"B": "2"}
+    assert d["only_in_target"] == {"C": "3"}
+    assert d["different"] == {"A": {"dev": "1", "prod": "x"}}
+    assert d["source_label"] == "dev"
+    assert d["target_label"] == "prod"
+
+
+def test_diff_to_dict_no_mask():
+    long_secret = "a" * 40
+    result = diff_envs({"KEY": long_secret}, {"KEY": "short"})
+    d = result.to_dict(mask_secrets=False)
+    assert d["only_in_source"] == {}
+    assert d["different"]["KEY"]["source"] == long_secret
+
+
+def test_format_diff_json_parsable():
+    import json
+    result = diff_envs({"A": "1", "B": "2"}, {"A": "x", "C": "3"})
+    output = format_diff_json(result, "dev", "prod")
+    data = json.loads(output)
+    assert data["has_differences"] is True
+    assert data["different"]["A"]["dev"] == "1"
+    assert data["different"]["A"]["prod"] == "x"
+    assert data["only_in_source"]["B"] == "2"
+    assert data["only_in_target"]["C"] == "3"
 
 
 # ── Sync ────────────────────────────────────────────────────────────────────
@@ -782,6 +831,93 @@ def test_cli_diff_files_fail_on_missing_ok(tmp_path):
         ["diff-files", str(env_a), str(env_b), "--fail-on-missing"],
     )
     assert result.exit_code == 0
+
+
+def test_cli_diff_json_output(tmp_path):
+    """diff --json outputs valid JSON with diff data."""
+    import json
+    from envault.cli import app
+    from typer.testing import CliRunner
+
+    env_a = tmp_path / "a.env"
+    env_b = tmp_path / "b.env"
+    env_a.write_text("KEY_A=old\nKEY_B=2\n")
+    env_b.write_text("KEY_A=new\nKEY_C=3\n")
+
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        ["diff", "--source", str(env_a), "--target", str(env_b), "--json"],
+    )
+    assert result.exit_code == 0
+    data = json.loads(result.stdout)
+    assert data["has_differences"] is True
+    assert data["total_differences"] == 3
+    assert "KEY_B" in data["only_in_source"]
+    assert "KEY_C" in data["only_in_target"]
+    assert "KEY_A" in data["different"]
+
+
+def test_cli_diff_json_identical(tmp_path):
+    """diff --json on identical files reports no differences."""
+    import json
+    from envault.cli import app
+    from typer.testing import CliRunner
+
+    env_a = tmp_path / "a.env"
+    env_b = tmp_path / "b.env"
+    env_a.write_text("KEY=val\n")
+    env_b.write_text("KEY=val\n")
+
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        ["diff", "--source", str(env_a), "--target", str(env_b), "--json"],
+    )
+    assert result.exit_code == 0
+    data = json.loads(result.stdout)
+    assert data["has_differences"] is False
+    assert data["total_differences"] == 0
+
+
+def test_cli_diff_files_json_output(tmp_path):
+    """diff-files --json outputs valid JSON."""
+    import json
+    from envault.cli import app
+    from typer.testing import CliRunner
+
+    env_a = tmp_path / "a.env"
+    env_b = tmp_path / "b.env"
+    env_a.write_text("X=1\nY=2\n")
+    env_b.write_text("X=1\nZ=3\n")
+
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        ["diff-files", str(env_a), str(env_b), "--json"],
+    )
+    assert result.exit_code == 0
+    data = json.loads(result.stdout)
+    assert data["has_differences"] is True
+    assert "Y" in data["only_in_source"]
+    assert "Z" in data["only_in_target"]
+    assert "X" in data["common_keys"]
+
+
+def test_cli_diff_json_file_not_found(tmp_path):
+    """diff --json on missing file outputs JSON error."""
+    import json
+    from envault.cli import app
+    from typer.testing import CliRunner
+
+    runner = CliRunner(mix_stderr=True)
+    result = runner.invoke(
+        app,
+        ["diff", "--source", str(tmp_path / "nope.env"), "--target", str(tmp_path / "nope2.env"), "--json"],
+    )
+    assert result.exit_code == 1
+    data = json.loads(result.output)
+    assert "error" in data
 
 
 def test_cli_help():

@@ -5,10 +5,16 @@ from __future__ import annotations
 import typer
 from envault import __version__
 from envault.audit import AuditLogger
+from envault.backup import backup_env_files, restore_env_files
 from envault.config import EnvaultConfig, init_config
-from envault.diff import diff_env_files, format_diff
+from envault.diff import diff_env_files, format_diff, format_diff_json
 from envault.encrypt import decrypt_env, encrypt_env
 from envault.rotate import rotate_env_var
+from envault.security import (
+    SecurityAuditResult,
+    format_security_report,
+    run_security_audit,
+)
 from envault.serve import run_server
 from envault.stores import get_store
 from envault.sync import sync_env_files
@@ -82,6 +88,7 @@ def diff(
     target_file: str | None = typer.Option(None, "--target", "-t", help="Target .env file path (overrides env name)"),
     config_path: str = typer.Option("", "--config", "-c", help="Config file path"),
     fail_on_missing: bool = typer.Option(False, "--fail-on-missing", help="Exit with code 1 if source has keys not in target"),
+    json_output: bool = typer.Option(False, "--json", help="Output diff as JSON for programmatic use"),
 ):
     """Diff environment variables between two environments or .env files."""
     config = load_config(config_path)
@@ -96,12 +103,19 @@ def diff(
             result = diff_env_files(src_path, tgt_path)
             label_s, label_t = source_env, target_env
     except FileNotFoundError as e:
-        err_console.print(f"[red]Error:[/red] {e}")
+        if json_output:
+            import json as _json
+            err_console.print(_json.dumps({"error": str(e)}))
+        else:
+            err_console.print(f"[red]Error:[/red] {e}")
         raise typer.Exit(code=1) from None
 
-    console.print(format_diff(result, label_s, label_t))
+    if json_output:
+        console.print(format_diff_json(result, label_s, label_t))
+    else:
+        console.print(format_diff(result, label_s, label_t))
 
-    if result.has_differences:
+    if not json_output and result.has_differences:
         console.print(f"\nTotal: {result.total_differences} difference(s)")
 
     if fail_on_missing and result.only_in_source:
@@ -115,16 +129,24 @@ def diff_files(
     file1: str = typer.Argument(..., help="First .env file"),
     file2: str = typer.Argument(..., help="Second .env file"),
     fail_on_missing: bool = typer.Option(False, "--fail-on-missing", help="Exit with code 1 if source has keys not in target"),
+    json_output: bool = typer.Option(False, "--json", help="Output diff as JSON for programmatic use"),
 ):
     """Diff two .env files directly (no config needed)."""
     try:
         result = diff_env_files(file1, file2)
     except FileNotFoundError as e:
-        err_console.print(f"[red]Error:[/red] {e}")
+        if json_output:
+            import json as _json
+            err_console.print(_json.dumps({"error": str(e)}))
+        else:
+            err_console.print(f"[red]Error:[/red] {e}")
         raise typer.Exit(code=1) from None
-    console.print(format_diff(result, Path(file1).name, Path(file2).name))
-    if result.has_differences:
-        console.print(f"\nTotal: {result.total_differences} difference(s)")
+    if json_output:
+        console.print(format_diff_json(result, Path(file1).name, Path(file2).name))
+    else:
+        console.print(format_diff(result, Path(file1).name, Path(file2).name))
+        if result.has_differences:
+            console.print(f"\nTotal: {result.total_differences} difference(s)")
 
     if fail_on_missing and result.only_in_source:
         raise typer.Exit(1)
@@ -423,6 +445,112 @@ def decrypt(
         console.print(f"[yellow]🗑 Deleted encrypted: {input_file}[/yellow]")
 
 
+# ── Backup / Restore ──────────────────────────────────────────────────────────
+
+@app.command()
+def backup(
+    env: str | None = typer.Option(None, "--env", "-e", help="Specific environment to back up (default: all)"),
+    file: Path | None = typer.Option(None, "--file", "-f", help="Direct .env file path (no config needed)"),
+    output: Path | None = typer.Option(None, "--output", "-o", help="Output path for backup archive"),
+    password: str | None = typer.Option(None, "--password", "-p", help="Encryption password (prompted if omitted, or use ENVAULT_ENCRYPT_KEY)"),
+    config_path: str = typer.Option("", "--config", "-c", help="Config file path"),
+):
+    """Backup .env files into an encrypted archive.
+
+    Uses Fernet symmetric encryption (same as envault encrypt).
+    By default, backs up all environments defined in .envault.yml.
+
+    Examples:
+
+      envault backup                    # All envs from config
+
+      envault backup --env prod         # Just the prod environment
+
+      envault backup --file .env        # Direct file (no config needed)
+    """
+    env_files: list[Path] = []
+
+    if file:
+        # Direct file mode — no config needed
+        env_files = [file]
+    else:
+        # Config mode — one or all environments
+        config = load_config(config_path)
+        if env:
+            env_path = config.get_env_path(env)
+            if not env_path.exists():
+                err_console.print(f"[red]Error:[/red] Environment file '{env_path}' not found")
+                raise typer.Exit(1)
+            env_files = [env_path]
+        else:
+            # Back up all environments defined in config
+            for e in config.environments:
+                p = Path(e.env_file)
+                if p.exists():
+                    env_files.append(p)
+            # Also include .env if it exists and isn't already listed
+            default_env = Path(".env")
+            if default_env.exists() and default_env not in env_files:
+                env_files.append(default_env)
+            if not env_files:
+                err_console.print("[yellow]No .env files found in config[/yellow]")
+                raise typer.Exit(0)
+
+    try:
+        result = backup_env_files(env_files, output_path=output, password=password)
+    except FileNotFoundError as e:
+        err_console.print(f"[red]Error:[/red] {e}")
+        raise typer.Exit(1) from None
+    except ValueError as e:
+        err_console.print(f"[red]Error:[/red] {e}")
+        raise typer.Exit(1) from None
+
+    file_count = len(env_files)
+    console.print(f"[green]✓[/green] Backed up {file_count} .env file(s) → {result}")
+
+
+@app.command()
+def restore(
+    backup_file: Path = typer.Argument(..., help="Path to .envault.bak backup file", exists=True),
+    output_dir: Path | None = typer.Option(None, "--output-dir", "-o", help="Directory to restore files into (default: current directory)"),
+    password: str | None = typer.Option(None, "--password", "-p", help="Decryption password (prompted if omitted, or use ENVAULT_ENCRYPT_KEY)"),
+    overwrite: bool = typer.Option(False, "--overwrite", help="Overwrite existing files"),
+):
+    """Restore .env files from an encrypted backup archive.
+
+    Extracts all .env files from the backup, preserving their original
+    relative paths. Use --output-dir to restore into a different directory.
+
+    Examples:
+
+      envault restore backup.envault.bak
+
+      envault restore backup.envault.bak --output-dir ./restored
+
+      envault restore backup.envault.bak --overwrite
+    """
+    try:
+        restored = restore_env_files(
+            backup_file,
+            output_dir=output_dir,
+            password=password,
+            overwrite=overwrite,
+        )
+    except FileNotFoundError as e:
+        err_console.print(f"[red]Error:[/red] {e}")
+        raise typer.Exit(1) from None
+    except ValueError as e:
+        err_console.print(f"[red]Error:[/red] {e}")
+        raise typer.Exit(1) from None
+    except FileExistsError as e:
+        err_console.print(f"[red]Error:[/red] {e}")
+        raise typer.Exit(1) from None
+
+    console.print(f"[green]✓[/green] Restored {len(restored)} .env file(s):")
+    for f in restored:
+        console.print(f"  {f}")
+
+
 # ── Audit ───────────────────────────────────────────────────────────────────
 
 @app.command()
@@ -459,6 +587,85 @@ def audit(
     console.print(table)
 
 
+# ── Security Check ────────────────────────────────────────────────────────────
+
+@app.command()
+def check(
+    env: str | None = typer.Option(None, "--env", "-e", help="Environment to check (from config)"),
+    file: str | None = typer.Option(None, "--file", "-f", help="Direct .env file path to check"),
+    strict: bool = typer.Option(False, "--strict", help="Treat warnings as critical (useful for CI)"),
+    json_output: bool = typer.Option(False, "--json", help="Output findings as JSON"),
+    config_path: str = typer.Option("", "--config", "-c", help="Config file path"),
+):
+    """Security audit: scan .env files for weak secrets, placeholders, and misconfigurations.
+
+    Checks for:
+    - Weak/placeholder values on secret keys (password, secret, token, etc.)
+    - Short secret values (< 12 chars)
+    - Duplicate keys within a file
+    - Unquoted values with special characters
+    - Inline comments on secret lines
+    - .env files not covered by .gitignore
+    - World-readable file permissions (Unix)
+
+    Use --strict to fail (exit 1) on any warning, not just critical issues.
+    """
+    env_files: list[str] = []
+
+    if file:
+        # Direct file mode — no config needed
+        env_files = [file]
+    else:
+        # Config mode — check one or all environments
+        config = load_config(config_path)
+        if env:
+            env_path = config.get_env_path(env)
+            if not env_path.exists():
+                err_console.print(f"[red]Error:[/red] Environment file '{env_path}' not found")
+                raise typer.Exit(1)
+            env_files = [str(env_path)]
+        else:
+            # Check all environments defined in config
+            for e in config.environments:
+                if Path(e.env_file).exists():
+                    env_files.append(e.env_file)
+            if not env_files:
+                err_console.print("[yellow]No .env files found in config[/yellow]")
+                raise typer.Exit(0)
+
+    result = run_security_audit(env_files, strict=strict)
+
+    if json_output:
+        import json
+
+        output = {
+            "files_scanned": result.files_scanned,
+            "keys_scanned": result.keys_scanned,
+            "critical": result.critical_count,
+            "warning": result.warning_count,
+            "info": result.info_count,
+            "findings": [
+                {
+                    "severity": f.severity,
+                    "rule_id": f.rule_id,
+                    "message": f.message,
+                    "key": f.key,
+                    "value_preview": f.value_preview,
+                    "line_number": f.line_number,
+                }
+                for f in result.findings
+            ],
+        }
+        console.print_json(json.dumps(output, indent=2))
+    else:
+        label = ", ".join(Path(f).name for f in env_files)
+        console.print(format_security_report(result, file_label=label))
+
+    # Exit with error if any critical issues found (or warnings in strict mode)
+    if result.has_critical:
+        raise typer.Exit(1)
+
+
 # ── Serve (HTTP API) ──────────────────────────────────────────────────────────
 
 @app.command()
@@ -472,6 +679,7 @@ def serve(
     api_key: str | None = typer.Option(None, "--api-key", help="API key for X-API-Key header auth (or set ENVAULT_API_KEY)"),
     auth_mode: str = typer.Option("bearer", "--auth-mode", help="Auth mode: bearer (default), api-key, oauth2, any"),
     oauth_introspect_url: str | None = typer.Option(None, "--oauth-introspect-url", help="OAuth2 token introspection endpoint URL (or set ENVAULT_OAUTH_INTROSPECT_URL)"),
+    oauth_userinfo_url: str | None = typer.Option(None, "--oauth-userinfo-url", help="OAuth2/OIDC userinfo endpoint URL (or set ENVAULT_OAUTH_USERINFO_URL)"),
     oauth_client_id: str | None = typer.Option(None, "--oauth-client-id", help="OAuth2 client ID for introspection (or set ENVAULT_OAUTH_CLIENT_ID)"),
     oauth_client_secret: str | None = typer.Option(None, "--oauth-client-secret", help="OAuth2 client secret for introspection (or set ENVAULT_OAUTH_CLIENT_SECRET)"),
 ):
@@ -493,7 +701,7 @@ def serve(
 
     --auth-mode api-key: X-API-Key header via --api-key / ENVAULT_API_KEY
 
-    --auth-mode oauth2: Bearer token validated via OAuth2 introspection (--oauth-introspect-url)
+    --auth-mode oauth2: Bearer token validated via OAuth2 introspection (--oauth-introspect-url) or userinfo (--oauth-userinfo-url)
 
     --auth-mode any: Accept X-API-Key or Bearer token (tries X-API-Key first)
     """
@@ -502,6 +710,7 @@ def serve(
         config, port=port, host=host, encrypt_key=password, store_name=store,
         api_token=api_token, api_key=api_key, auth_mode=auth_mode,
         oauth_introspect_url=oauth_introspect_url,
+        oauth_userinfo_url=oauth_userinfo_url,
         oauth_client_id=oauth_client_id,
         oauth_client_secret=oauth_client_secret,
     )
