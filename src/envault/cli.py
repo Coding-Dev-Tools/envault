@@ -469,21 +469,42 @@ def serve(
     store: str | None = typer.Option(None, "--store", "-s", help="Named store from config to use"),
     config_path: str = typer.Option("", "--config", "-c", help="Config file path"),
     api_token: str | None = typer.Option(None, "--api-token", "-t", help="Bearer token for API auth (or set ENVAULT_API_TOKEN)"),
+    api_key: str | None = typer.Option(None, "--api-key", help="API key for X-API-Key header auth (or set ENVAULT_API_KEY)"),
+    auth_mode: str = typer.Option("bearer", "--auth-mode", help="Auth mode: bearer (default), api-key, oauth2, any"),
+    oauth_introspect_url: str | None = typer.Option(None, "--oauth-introspect-url", help="OAuth2 token introspection endpoint URL (or set ENVAULT_OAUTH_INTROSPECT_URL)"),
+    oauth_client_id: str | None = typer.Option(None, "--oauth-client-id", help="OAuth2 client ID for introspection (or set ENVAULT_OAUTH_CLIENT_ID)"),
+    oauth_client_secret: str | None = typer.Option(None, "--oauth-client-secret", help="OAuth2 client secret for introspection (or set ENVAULT_OAUTH_CLIENT_SECRET)"),
 ):
     """Start an HTTP server that exposes decrypted secrets as a JSON API.
 
     Endpoints:
 
-    GET /secrets — list all secret keys (requires Bearer token if --api-token set)
+    GET /secrets — list all secret keys (auth required if any auth is configured)
 
     GET /secrets?prefix=X — filter keys by prefix
 
     GET /secrets/{key} — get decrypted value for a key
 
     GET /health — store connectivity check (no auth required)
+
+    Authentication:
+
+    --auth-mode bearer (default): Bearer token via --api-token / ENVAULT_API_TOKEN
+
+    --auth-mode api-key: X-API-Key header via --api-key / ENVAULT_API_KEY
+
+    --auth-mode oauth2: Bearer token validated via OAuth2 introspection (--oauth-introspect-url)
+
+    --auth-mode any: Accept X-API-Key or Bearer token (tries X-API-Key first)
     """
     config = load_config(config_path)
-    run_server(config, port=port, host=host, encrypt_key=password, store_name=store, api_token=api_token)
+    run_server(
+        config, port=port, host=host, encrypt_key=password, store_name=store,
+        api_token=api_token, api_key=api_key, auth_mode=auth_mode,
+        oauth_introspect_url=oauth_introspect_url,
+        oauth_client_id=oauth_client_id,
+        oauth_client_secret=oauth_client_secret,
+    )
 
 
 # ── Version ─────────────────────────────────────────────────────────────────

@@ -4,21 +4,33 @@ Endpoints:
  GET /secrets -> list all secret keys (or filter by ?prefix=FOO)
  GET /secrets/{key} -> get decrypted value for a specific key
  GET /health -> connectivity check for the backing store
- GET /auth/info -> show configured auth methods and identity
+ GET /auth/info -> show configured auth methods (no secrets exposed)
+
+Authentication:
+ - Bearer token (Authorization: Bearer <token>) — static or OAuth2 introspection
+ - API key (X-API-Key: <key>) header
+ - Configurable via --auth-mode: "bearer", "api-key", "oauth2", "any"
 """
 
 from __future__ import annotations
 
 import json
 import os
-from envault.auth import BearerAuth, MultiAuth, ApiKeyAuth, OAuth2Auth, build_auth_from_env
+import time
 from envault.config import EnvaultConfig
 from envault.encrypt import KEY_ENV_VAR
 from envault.stores import LocalEnvStore, SecretStore, get_store
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 from typing import Any
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import parse_qs, urlencode, urlparse
+from urllib.request import Request, urlopen
+from urllib.error import URLError
+
+
+# In-memory cache for OAuth2 token validation results
+_oauth2_cache: dict[str, tuple[bool, float]] = {}
+_OAUTH2_CACHE_TTL = 300  # seconds
 
 
 class SecretHandler(BaseHTTPRequestHandler):
@@ -29,6 +41,10 @@ class SecretHandler(BaseHTTPRequestHandler):
     config: EnvaultConfig
     encrypt_key: str | None
     api_token: str | None
+    api_key: str | None
+    auth_mode: str  # "bearer", "api-key", "oauth2", "any"
+    oauth_introspect_url: str | None
+    oauth_userinfo_url: str | None
 
     # ── Helpers ──────────────────────────────────────────────────────────────
 
@@ -47,31 +63,215 @@ class SecretHandler(BaseHTTPRequestHandler):
 
     # ── Auth ─────────────────────────────────────────────────────────────────
 
-    def _check_auth(self) -> bool:
-        """Verify Bearer token if api_token is configured.
+    def _check_bearer_token(self) -> bool:
+        """Check Bearer token — static or OAuth2 introspection/userinfo.
 
-        Returns True if the request is authenticated (or auth is disabled).
-        Sends a 401 and returns False if authentication fails.
+        Returns True if authenticated.
+        Returns False if auth failed (error already sent).
         """
-        if not self.api_token:
-            # No token configured — auth not required
-            return True
-
         auth_header = self.headers.get("Authorization", "")
         if not auth_header.startswith("Bearer "):
             self._send_error(401, "Unauthorized: Bearer token required")
             return False
 
         token = auth_header[len("Bearer "):]
-        if token != self.api_token:
+
+        # If OAuth2 introspection URL is configured, validate via introspection
+        if self.oauth_introspect_url:
+            return self._oauth2_introspect(token)
+
+        # If OAuth2 userinfo URL is configured, validate via userinfo
+        if self.oauth_userinfo_url:
+            return self._oauth2_userinfo(token)
+
+        # Otherwise, fall back to static token check
+        if token != (self.api_token or ""):
             self._send_error(403, "Forbidden: invalid token")
             return False
 
         return True
 
+    def _oauth2_introspect(self, token: str) -> bool:
+        """Validate a Bearer token via OAuth2 token introspection (RFC 7662).
+
+        POSTs to the configured introspection endpoint with the token.
+        Returns True if the endpoint returns ``{"active": true}``.
+        Returns False and sends a 401/403 on failure.
+        Results are cached for _OAUTH2_CACHE_TTL seconds.
+        """
+        # Check cache
+        cached = _oauth2_cache.get(token)
+        if cached is not None:
+            is_active, expires_at = cached
+            if time.monotonic() < expires_at:
+                if is_active:
+                    return True
+                self._send_error(401, "Unauthorized: token is not active")
+                return False
+            del _oauth2_cache[token]
+
+        try:
+            # Try using requests if available (better error handling / timeouts)
+            import requests  # type: ignore[import-untyped]
+
+            resp = requests.post(
+                self.oauth_introspect_url,
+                data={"token": token},
+                headers={"Content-Type": "application/x-www-form-urlencoded"},
+                timeout=5,
+            )
+            if resp.status_code != 200:
+                _oauth2_cache[token] = (False, time.monotonic() + 60)
+                self._send_error(401, "Unauthorized: token introspection failed")
+                return False
+            result = resp.json()
+        except ImportError:
+            # Fallback to stdlib urllib
+            try:
+                body = urlencode({"token": token}).encode("utf-8")
+                req = Request(
+                    self.oauth_introspect_url,
+                    data=body,
+                    headers={"Content-Type": "application/x-www-form-urlencoded"},
+                    method="POST",
+                )
+                with urlopen(req, timeout=5) as resp:  # noqa: S310
+                    if resp.status != 200:
+                        _oauth2_cache[token] = (False, time.monotonic() + 60)
+                        self._send_error(401, "Unauthorized: token introspection failed")
+                        return False
+                    result = json.loads(resp.read().decode("utf-8"))
+            except (URLError, OSError, json.JSONDecodeError) as exc:
+                self._send_error(502, f"Token introspection error: {exc}")
+                return False
+            except Exception as exc:
+                self._send_error(502, f"Token introspection error: {exc}")
+                return False
+
+        if not result.get("active", False):
+            _oauth2_cache[token] = (False, time.monotonic() + 60)
+            self._send_error(401, "Unauthorized: token is not active")
+            return False
+
+        # Cache successful result
+        _oauth2_cache[token] = (True, time.monotonic() + _OAUTH2_CACHE_TTL)
+        return True
+
+    def _oauth2_userinfo(self, token: str) -> bool:
+        """Validate a Bearer token via OAuth2 userinfo endpoint (OIDC).
+
+        GETs the userinfo endpoint with the Bearer token.
+        Returns True if the endpoint returns 200 with user info.
+        Returns False and sends a 401 on failure.
+        Results are cached for _OAUTH2_CACHE_TTL seconds.
+        """
+        # Check cache
+        cached = _oauth2_cache.get(token)
+        if cached is not None:
+            is_active, expires_at = cached
+            if time.monotonic() < expires_at:
+                if is_active:
+                    return True
+                self._send_error(401, "Unauthorized: token rejected by provider")
+                return False
+            del _oauth2_cache[token]
+
+        try:
+            # Try using requests if available
+            import requests  # type: ignore[import-untyped]
+
+            resp = requests.get(
+                self.oauth_userinfo_url,
+                headers={"Authorization": f"Bearer {token}"},
+                timeout=5,
+            )
+            if resp.status_code != 200:
+                _oauth2_cache[token] = (False, time.monotonic() + 60)
+                self._send_error(401, "Unauthorized: token rejected by provider")
+                return False
+        except ImportError:
+            # Fallback to stdlib urllib
+            try:
+                req = Request(
+                    self.oauth_userinfo_url,
+                    headers={"Authorization": f"Bearer {token}"},
+                    method="GET",
+                )
+                with urlopen(req, timeout=5) as resp:  # noqa: S310
+                    if resp.status != 200:
+                        _oauth2_cache[token] = (False, time.monotonic() + 60)
+                        self._send_error(401, "Unauthorized: token rejected by provider")
+                        return False
+            except (URLError, OSError) as exc:
+                self._send_error(502, f"OAuth2 userinfo error: {exc}")
+                return False
+            except Exception as exc:
+                self._send_error(502, f"OAuth2 userinfo error: {exc}")
+                return False
+
+        # Cache successful result
+        _oauth2_cache[token] = (True, time.monotonic() + _OAUTH2_CACHE_TTL)
+        return True
+
+    def _check_auth(self) -> bool:
+        """Verify authentication based on the configured auth mode.
+
+        Auth modes:
+        - "bearer": Bearer token only (static or OAuth2 introspection/userinfo)
+        - "api-key": X-API-Key header only
+        - "oauth2": Bearer token validated via OAuth2 introspection or userinfo
+        - "any": Try X-API-Key first, then Bearer token
+
+        Returns True if the request is authenticated (or auth is disabled).
+        Sends a 401/403 and returns False if authentication fails.
+        """
+        # If no auth credentials are configured at all, skip auth
+        has_any_auth = self.api_token or self.api_key or self.oauth_introspect_url or self.oauth_userinfo_url
+        if not has_any_auth:
+            return True
+
+        mode = self.auth_mode
+
+        if mode == "api-key":
+            # Only X-API-Key is accepted
+            if not self.api_key:
+                self._send_error(401, "Unauthorized: X-API-Key header required (no API key configured)")
+                return False
+            api_key_header = self.headers.get("X-API-Key", "")
+            if not api_key_header:
+                self._send_error(401, "Unauthorized: X-API-Key header required")
+                return False
+            if api_key_header != self.api_key:
+                self._send_error(403, "Forbidden: invalid API key")
+                return False
+            return True
+
+        if mode == "oauth2":
+            # Bearer token required, validated via OAuth2
+            if not self.oauth_introspect_url and not self.oauth_userinfo_url:
+                self._send_error(401, "Unauthorized: OAuth2 endpoint not configured")
+                return False
+            return self._check_bearer_token()
+
+        if mode == "any":
+            # Try X-API-Key first, then Bearer
+            api_key_header = self.headers.get("X-API-Key", "")
+            if api_key_header and self.api_key:
+                if api_key_header == self.api_key:
+                    return True
+                # API key was provided but wrong — return error immediately
+                self._send_error(403, "Forbidden: invalid API key")
+                return False
+
+            # Fall through to Bearer token check
+            return self._check_bearer_token()
+
+        # Default: "bearer" mode
+        return self._check_bearer_token()
+
     # ── Routing ──────────────────────────────────────────────────────────────
 
-    def do_GET(self) -> None: # noqa: N802 – stdlib naming convention
+    def do_GET(self) -> None:  # noqa: N802 – stdlib naming convention
         parsed = urlparse(self.path)
         path = parsed.path.rstrip("/") or "/"
         query = parse_qs(parsed.query)
@@ -79,6 +279,11 @@ class SecretHandler(BaseHTTPRequestHandler):
         # Health endpoint is always accessible (useful for load balancers)
         if path == "/health":
             self._handle_health()
+            return
+
+        # Auth info endpoint shows configured methods (no secrets exposed)
+        if path == "/auth/info":
+            self._handle_auth_info()
             return
 
         # All other endpoints require auth
@@ -118,6 +323,29 @@ class SecretHandler(BaseHTTPRequestHandler):
 
         overall = "ok" if all(c.get("status") == "ok" for c in checks.values()) else "error"
         self._send_json({"status": overall, "checks": checks})
+
+    def _handle_auth_info(self) -> None:
+        """GET /auth/info — show configured auth methods (no secrets exposed).
+
+        This endpoint is always accessible (like /health) so clients can
+        discover what auth methods the server accepts before making
+        authenticated requests.
+        """
+        methods: list[str] = []
+        if self.api_token:
+            methods.append("bearer")
+        if self.api_key:
+            methods.append("api-key")
+        if self.oauth_introspect_url:
+            methods.append("oauth2-introspect")
+        if self.oauth_userinfo_url:
+            methods.append("oauth2-userinfo")
+
+        self._send_json({
+            "auth_mode": self.auth_mode,
+            "methods": methods,
+            "requires_auth": bool(self.api_token or self.api_key or self.oauth_introspect_url or self.oauth_userinfo_url),
+        })
 
     def _handle_secrets_list(self, query: dict[str, list[str]]) -> None:
         """GET /secrets — list keys, optionally filtered by ?prefix=."""
@@ -164,7 +392,16 @@ def _get_encrypt_key() -> str | None:
         return None
 
 
-def create_handler(store: SecretStore, config: EnvaultConfig, encrypt_key: str | None = None, api_token: str | None = None):
+def create_handler(
+    store: SecretStore,
+    config: EnvaultConfig,
+    encrypt_key: str | None = None,
+    api_token: str | None = None,
+    api_key: str | None = None,
+    auth_mode: str = "bearer",
+    oauth_introspect_url: str | None = None,
+    oauth_userinfo_url: str | None = None,
+):
     """Return a BaseHTTPRequestHandler subclass bound to the given store/config.
 
     This avoids mutating the class-level attributes on SecretHandler directly,
@@ -174,10 +411,14 @@ def create_handler(store: SecretStore, config: EnvaultConfig, encrypt_key: str |
     class _Handler(SecretHandler):
         pass
 
-    _Handler.store = store # type: ignore[attr-defined]
-    _Handler.config = config # type: ignore[attr-defined]
-    _Handler.encrypt_key = encrypt_key # type: ignore[attr-defined]
-    _Handler.api_token = api_token # type: ignore[attr-defined]
+    _Handler.store = store  # type: ignore[attr-defined]
+    _Handler.config = config  # type: ignore[attr-defined]
+    _Handler.encrypt_key = encrypt_key  # type: ignore[attr-defined]
+    _Handler.api_token = api_token  # type: ignore[attr-defined]
+    _Handler.api_key = api_key  # type: ignore[attr-defined]
+    _Handler.auth_mode = auth_mode  # type: ignore[attr-defined]
+    _Handler.oauth_introspect_url = oauth_introspect_url  # type: ignore[attr-defined]
+    _Handler.oauth_userinfo_url = oauth_userinfo_url  # type: ignore[attr-defined]
     return _Handler
 
 
@@ -188,6 +429,10 @@ def run_server(
     encrypt_key: str | None = None,
     store_name: str | None = None,
     api_token: str | None = None,
+    api_key: str | None = None,
+    auth_mode: str = "bearer",
+    oauth_introspect_url: str | None = None,
+    oauth_userinfo_url: str | None = None,
 ) -> None:
     """Start the HTTP server for the secrets API.
 
@@ -208,21 +453,65 @@ def run_server(
         Bearer token for API authentication. If *None*, reads from
         ENVAULT_API_TOKEN env var. If still unset, API auth is disabled
         with a warning (only safe on localhost).
+    api_key : str | None
+        API key for X-API-Key header authentication. If *None*, reads from
+        ENVAULT_API_KEY env var.
+    auth_mode : str
+        Authentication mode: "bearer" (default), "api-key", "oauth2", or "any".
+        - "bearer": Bearer token only (static or OAuth2)
+        - "api-key": X-API-Key header only
+        - "oauth2": Bearer token validated via OAuth2 introspection or userinfo
+        - "any": Accept either X-API-Key or Bearer token
+    oauth_introspect_url : str | None
+        OAuth2 token introspection endpoint URL (RFC 7662). If *None*, reads
+        from ENVAULT_OAUTH_INTROSPECT_URL env var. When set, Bearer tokens
+        are validated by POSTing to this endpoint.
+    oauth_userinfo_url : str | None
+        OAuth2/OIDC userinfo endpoint URL. If *None*, reads from
+        ENVAULT_OAUTH_USERINFO_URL env var. When set, Bearer tokens are
+        validated by GETting this endpoint.
     """
 
     # Resolve encryption key (same auth model as decrypt command)
     if encrypt_key is None:
         encrypt_key = _get_encrypt_key()
-    if not encrypt_key:
-        raise SystemExit("Error: encryption key required (set ENVAULT_ENCRYPT_KEY or provide --password)")
+        if not encrypt_key:
+            raise SystemExit("Error: encryption key required (set ENVAULT_ENCRYPT_KEY or provide --password)")
 
     # Resolve API token for Bearer auth
     if api_token is None:
         api_token = os.environ.get("ENVAULT_API_TOKEN")
-    if not api_token and host not in ("127.0.0.1", "localhost"):
+
+    # Resolve API key for X-API-Key auth
+    if api_key is None:
+        api_key = os.environ.get("ENVAULT_API_KEY")
+
+    # Resolve OAuth2 introspection URL
+    if oauth_introspect_url is None:
+        oauth_introspect_url = os.environ.get("ENVAULT_OAUTH_INTROSPECT_URL")
+
+    # Resolve OAuth2 userinfo URL
+    if oauth_userinfo_url is None:
+        oauth_userinfo_url = os.environ.get("ENVAULT_OAUTH_USERINFO_URL")
+
+    # Validate auth_mode
+    valid_modes = ("bearer", "api-key", "oauth2", "any")
+    if auth_mode not in valid_modes:
+        raise SystemExit(f"Error: invalid auth mode '{auth_mode}'. Choose from: {', '.join(valid_modes)}")
+
+    # For oauth2 mode, at least one OAuth2 endpoint is required
+    if auth_mode == "oauth2" and not oauth_introspect_url and not oauth_userinfo_url:
         raise SystemExit(
-            "Error: API token required when binding to non-localhost address. "
-            "Set ENVAULT_API_TOKEN or pass --api-token."
+            "Error: OAuth2 endpoint required for 'oauth2' auth mode. "
+            "Set ENVAULT_OAUTH_INTROSPECT_URL or ENVAULT_OAUTH_USERINFO_URL."
+        )
+
+    # Safety check: require some auth on non-localhost
+    has_any_auth = api_token or api_key or oauth_introspect_url or oauth_userinfo_url
+    if not has_any_auth and host not in ("127.0.0.1", "localhost"):
+        raise SystemExit(
+            "Error: API authentication required when binding to non-localhost address. "
+            "Set ENVAULT_API_TOKEN, ENVAULT_API_KEY, or ENVAULT_OAUTH_INTROSPECT_URL."
         )
 
     # Build the store instance
@@ -235,20 +524,41 @@ def run_server(
     else:
         store_instance = get_store("")
 
-    handler_class = create_handler(store_instance, config, encrypt_key, api_token=api_token)
+    handler_class = create_handler(
+        store_instance, config, encrypt_key,
+        api_token=api_token,
+        api_key=api_key,
+        auth_mode=auth_mode,
+        oauth_introspect_url=oauth_introspect_url,
+        oauth_userinfo_url=oauth_userinfo_url,
+    )
     server = HTTPServer((host, port), handler_class)
 
     from rich.console import Console
     console = Console()
     console.print(f"[green]✓[/green] envault serve listening on http://{host}:{port}")
-    console.print(" GET /secrets — list all secret keys")
-    console.print(" GET /secrets?prefix=X — filter keys by prefix")
-    console.print(" GET /secrets/{key} — get decrypted value")
-    console.print(" GET /health — store connectivity check")
-    if api_token:
-        console.print("[green]🔒[/green] API authentication enabled (Bearer token)")
+    console.print("  GET /secrets — list all secret keys")
+    console.print("  GET /secrets?prefix=X — filter keys by prefix")
+    console.print("  GET /secrets/{key} — get decrypted value")
+    console.print("  GET /health — store connectivity check")
+    console.print("  GET /auth/info — show configured auth methods")
+
+    # Auth status
+    if has_any_auth:
+        auth_parts = []
+        if api_token:
+            auth_parts.append("Bearer token")
+        if api_key:
+            auth_parts.append("X-API-Key")
+        if oauth_introspect_url:
+            auth_parts.append("OAuth2 introspect")
+        if oauth_userinfo_url:
+            auth_parts.append("OAuth2 userinfo")
+        auth_desc = " + ".join(auth_parts) if auth_parts else "configured"
+        console.print(f"[green]🔒[/green] API authentication enabled ({auth_desc}), mode: {auth_mode}")
     else:
-        console.print("[yellow]⚠[/yellow] No API token set — secrets accessible without auth (localhost only)")
+        console.print("[yellow]⚠[/yellow] No API auth configured — secrets accessible without auth (localhost only)")
+
     console.print("[dim]Press Ctrl+C to stop[/dim]")
 
     try:

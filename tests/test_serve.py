@@ -36,14 +36,29 @@ class _FakeStore:
         return keys
 
 
-def _make_handler(store, config: EnvaultConfig | None = None, api_token: str | None = None):
+def _make_handler(
+    store,
+    config: EnvaultConfig | None = None,
+    api_token: str | None = None,
+    api_key: str | None = None,
+    auth_mode: str = "bearer",
+    oauth_introspect_url: str | None = None,
+    oauth_client_id: str | None = None,
+    oauth_client_secret: str | None = None,
+):
     """Create a handler class bound to the given store and return a mock instance.
 
     We create a mock request handler that has the routing logic from
     SecretHandler but uses pre-set wfile/rfile so we can inspect output.
     """
     config = config or EnvaultConfig()
-    handler_class = create_handler(store, config, encrypt_key="test-key", api_token=api_token)
+    handler_class = create_handler(
+        store, config, encrypt_key="test-key", api_token=api_token,
+        api_key=api_key, auth_mode=auth_mode,
+        oauth_introspect_url=oauth_introspect_url,
+        oauth_client_id=oauth_client_id,
+        oauth_client_secret=oauth_client_secret,
+    )
 
     # Build a minimal instance that has enough of BaseHTTPRequestHandler
     # wired up to test do_GET routing and response writing.
