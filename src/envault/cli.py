@@ -82,6 +82,7 @@ def diff(
     target_file: str | None = typer.Option(None, "--target", "-t", help="Target .env file path (overrides env name)"),
     config_path: str = typer.Option("", "--config", "-c", help="Config file path"),
     fail_on_missing: bool = typer.Option(False, "--fail-on-missing", help="Exit with code 1 if source has keys not in target"),
+    json_output: bool = typer.Option(False, "--json", help="Output result as JSON for programmatic use"),
 ):
     """Diff environment variables between two environments or .env files."""
     config = load_config(config_path)
@@ -99,9 +100,12 @@ def diff(
         err_console.print(f"[red]Error:[/red] {e}")
         raise typer.Exit(code=1) from None
 
-    console.print(format_diff(result, label_s, label_t))
+    if json_output:
+        console.print(result.to_json(source_label=label_s, target_label=label_t))
+    else:
+        console.print(format_diff(result, label_s, label_t))
 
-    if result.has_differences:
+    if not json_output and result.has_differences:
         console.print(f"\nTotal: {result.total_differences} difference(s)")
 
     if fail_on_missing and result.only_in_source:
@@ -115,6 +119,7 @@ def diff_files(
     file1: str = typer.Argument(..., help="First .env file"),
     file2: str = typer.Argument(..., help="Second .env file"),
     fail_on_missing: bool = typer.Option(False, "--fail-on-missing", help="Exit with code 1 if source has keys not in target"),
+    json_output: bool = typer.Option(False, "--json", help="Output result as JSON for programmatic use"),
 ):
     """Diff two .env files directly (no config needed)."""
     try:
@@ -122,8 +127,11 @@ def diff_files(
     except FileNotFoundError as e:
         err_console.print(f"[red]Error:[/red] {e}")
         raise typer.Exit(code=1) from None
-    console.print(format_diff(result, Path(file1).name, Path(file2).name))
-    if result.has_differences:
+    if json_output:
+        console.print(result.to_json(source_label=Path(file1).name, target_label=Path(file2).name))
+    else:
+        console.print(format_diff(result, Path(file1).name, Path(file2).name))
+    if not json_output and result.has_differences:
         console.print(f"\nTotal: {result.total_differences} difference(s)")
 
     if fail_on_missing and result.only_in_source:

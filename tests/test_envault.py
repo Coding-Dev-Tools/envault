@@ -147,6 +147,83 @@ def test_load_env_file(tmp_path):
     assert result == {"KEY": "value", "FOO": "bar"}
 
 
+# ── EnvDiffResult.to_dict / to_json ──────────────────────────────────────────
+
+
+def test_diff_result_to_dict_with_differences():
+    """to_dict should return a structured dict with all diff categories."""
+    result = diff_envs(
+        {"SHARED": "same", "ONLY_SRC": "val", "CHANGED": "old"},
+        {"SHARED": "same", "ONLY_TGT": "val2", "CHANGED": "new"},
+    )
+    d = result.to_dict(source_label="dev", target_label="prod")
+    assert d["has_differences"] is True
+    assert d["total_differences"] == 3
+    assert "ONLY_SRC" in d["only_in_source"]
+    assert "ONLY_TGT" in d["only_in_target"]
+    assert "CHANGED" in d["different"]
+    assert d["different"]["CHANGED"]["dev"] == "old"
+    assert d["different"]["CHANGED"]["prod"] == "new"
+    assert "SHARED" in d["common_keys"]
+
+
+def test_diff_result_to_dict_identical():
+    """to_dict with no differences should reflect identical envs."""
+    result = diff_envs({"A": "1", "B": "2"}, {"A": "1", "B": "2"})
+    d = result.to_dict()
+    assert d["has_differences"] is False
+    assert d["total_differences"] == 0
+    assert d["only_in_source"] == {}
+    assert d["only_in_target"] == {}
+    assert d["different"] == {}
+    assert set(d["common_keys"]) == {"A", "B"}
+
+
+def test_diff_result_to_dict_masking():
+    """to_dict should mask long secret-like values by default."""
+    result = diff_envs(
+        {"SHORT": "abc", "LONG_SECRET": "a_very_long_secret_value_that_exceeds_16_chars"},
+        {"SHORT": "abc"},  # SHORT is common, not only_in_source
+    )
+    d = result.to_dict()
+    # LONG_SECRET is only in source — long value should be masked
+    masked = d["only_in_source"]["LONG_SECRET"]
+    assert "..." in masked
+    assert masked != "a_very_long_secret_value_that_exceeds_16_chars"
+
+
+def test_diff_result_to_dict_no_mask():
+    """to_dict with mask_values=False should return raw values."""
+    result = diff_envs(
+        {"SECRET": "a_very_long_secret_value_that_exceeds_16_chars"},
+        {},
+    )
+    d = result.to_dict(mask_values=False)
+    assert d["only_in_source"]["SECRET"] == "a_very_long_secret_value_that_exceeds_16_chars"
+
+
+def test_diff_result_to_json_valid():
+    """to_json should return valid JSON that round-trips with to_dict."""
+    import json as _json
+    result = diff_envs(
+        {"A": "1", "B": "2"},
+        {"A": "1", "C": "3"},
+    )
+    json_str = result.to_json(source_label="src", target_label="tgt")
+    parsed = _json.loads(json_str)
+    assert parsed == result.to_dict(source_label="src", target_label="tgt")
+
+
+def test_diff_result_to_json_compact():
+    """to_json with indent=None should produce compact JSON."""
+    import json as _json
+    result = diff_envs({"A": "1"}, {"A": "2"})
+    json_str = result.to_json(indent=None)
+    assert "\n" not in json_str
+    parsed = _json.loads(json_str)
+    assert "A" in parsed["different"]
+
+
 def test_load_env_file_not_exists(tmp_path):
     with pytest.raises(FileNotFoundError):
         load_env_file(tmp_path / ".nonexistent")

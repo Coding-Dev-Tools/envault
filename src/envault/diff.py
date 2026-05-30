@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 from dotenv import dotenv_values
 from pathlib import Path
@@ -49,6 +50,61 @@ class EnvDiffResult:
     @property
     def has_differences(self) -> bool:
         return self.total_differences > 0
+
+    def to_dict(
+        self,
+        source_label: str = "source",
+        target_label: str = "target",
+        mask_values: bool = True,
+    ) -> dict:
+        """Return the diff result as a plain dict suitable for JSON serialisation.
+
+        Args:
+            source_label: Label for the source environment in the output.
+            target_label: Label for the target environment in the output.
+            mask_values: If True, long secret-like values are partially masked.
+        """
+        mask = _mask_value if mask_values else lambda v: v
+
+        only_in_source = {k: mask(v) for k, v in sorted(self.only_in_source.items())}
+        only_in_target = {k: mask(v) for k, v in sorted(self.only_in_target.items())}
+        different: dict[str, dict[str, str]] = {}
+        for k in sorted(self.different.keys()):
+            src_val, tgt_val = self.different[k]
+            different[k] = {
+                source_label: mask(src_val),
+                target_label: mask(tgt_val),
+            }
+        common_keys = sorted(self.common.keys()) if self.common else []
+
+        return {
+            "has_differences": self.has_differences,
+            "total_differences": self.total_differences,
+            "only_in_source": only_in_source,
+            "only_in_target": only_in_target,
+            "different": different,
+            "common_keys": common_keys,
+        }
+
+    def to_json(
+        self,
+        source_label: str = "source",
+        target_label: str = "target",
+        mask_values: bool = True,
+        indent: int | None = 2,
+    ) -> str:
+        """Return the diff result as a JSON string.
+
+        Args:
+            source_label: Label for the source environment in the output.
+            target_label: Label for the target environment in the output.
+            mask_values: If True, long secret-like values are partially masked.
+            indent: JSON indentation level (default 2). Pass None for compact output.
+        """
+        return json.dumps(
+            self.to_dict(source_label, target_label, mask_values),
+            indent=indent,
+        )
 
 
 def diff_envs(
