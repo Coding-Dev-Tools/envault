@@ -28,6 +28,28 @@ from urllib.error import URLError
 from urllib.parse import parse_qs, urlencode, urlparse
 from urllib.request import Request, urlopen
 
+
+def _http_post(url: str, body: bytes, headers: dict[str, str], timeout: int = 5) -> tuple[int, bytes]:
+    """Make an HTTP POST request via stdlib urllib.
+
+    Returns (status_code, response_body_bytes).
+    Raises (URLError, OSError) on network failures.
+    """
+    req = Request(url, data=body, headers=headers, method="POST")
+    with urlopen(req, timeout=timeout) as resp:  # noqa: S310
+        return resp.status, resp.read()
+
+
+def _http_get(url: str, headers: dict[str, str], timeout: int = 5) -> tuple[int, bytes]:
+    """Make an HTTP GET request via stdlib urllib.
+
+    Returns (status_code, response_body_bytes).
+    Raises (URLError, OSError) on network failures.
+    """
+    req = Request(url, headers=headers, method="GET")
+    with urlopen(req, timeout=timeout) as resp:  # noqa: S310
+        return resp.status, resp.read()
+
 # In-memory cache for OAuth2 token validation results
 _oauth2_cache: dict[str, tuple[bool, float]] = {}
 _OAUTH2_CACHE_TTL = 300  # seconds
@@ -122,42 +144,19 @@ class SecretHandler(BaseHTTPRequestHandler):
             introspect_headers["Authorization"] = f"Basic {encoded}"
 
         try:
-            # Try using requests if available (better error handling / timeouts)
-            import requests  # type: ignore[import-untyped]
-
-            resp = requests.post(
-                self.oauth_introspect_url,
-                data={"token": token},
-                headers=introspect_headers,
-                timeout=5,
-            )
-            if resp.status_code != 200:
+            body = urlencode({"token": token}).encode("utf-8")
+            status, raw = _http_post(self.oauth_introspect_url, body, introspect_headers)
+            if status != 200:
                 _oauth2_cache[token] = (False, time.monotonic() + 60)
                 self._send_error(401, "Unauthorized: token introspection failed")
                 return False
-            result = resp.json()
-        except ImportError:
-            # Fallback to stdlib urllib
-            try:
-                body = urlencode({"token": token}).encode("utf-8")
-                req = Request(
-                    self.oauth_introspect_url,
-                    data=body,
-                    headers=introspect_headers,
-                    method="POST",
-                )
-                with urlopen(req, timeout=5) as resp:  # noqa: S310
-                    if resp.status != 200:
-                        _oauth2_cache[token] = (False, time.monotonic() + 60)
-                        self._send_error(401, "Unauthorized: token introspection failed")
-                        return False
-                    result = json.loads(resp.read().decode("utf-8"))
-            except (URLError, OSError, json.JSONDecodeError) as exc:
-                self._send_error(502, f"Token introspection error: {exc}")
-                return False
-            except Exception as exc:
-                self._send_error(502, f"Token introspection error: {exc}")
-                return False
+            result = json.loads(raw.decode("utf-8"))
+        except (URLError, OSError, json.JSONDecodeError) as exc:
+            self._send_error(502, f"Token introspection error: {exc}")
+            return False
+        except Exception as exc:
+            self._send_error(502, f"Token introspection error: {exc}")
+            return False
 
         if not result.get("active", False):
             _oauth2_cache[token] = (False, time.monotonic() + 60)
@@ -188,37 +187,20 @@ class SecretHandler(BaseHTTPRequestHandler):
             del _oauth2_cache[token]
 
         try:
-            # Try using requests if available
-            import requests  # type: ignore[import-untyped]
-
-            resp = requests.get(
+            status, _raw = _http_get(
                 self.oauth_userinfo_url,
                 headers={"Authorization": f"Bearer {token}"},
-                timeout=5,
             )
-            if resp.status_code != 200:
+            if status != 200:
                 _oauth2_cache[token] = (False, time.monotonic() + 60)
                 self._send_error(401, "Unauthorized: token rejected by provider")
                 return False
-        except ImportError:
-            # Fallback to stdlib urllib
-            try:
-                req = Request(
-                    self.oauth_userinfo_url,
-                    headers={"Authorization": f"Bearer {token}"},
-                    method="GET",
-                )
-                with urlopen(req, timeout=5) as resp:  # noqa: S310
-                    if resp.status != 200:
-                        _oauth2_cache[token] = (False, time.monotonic() + 60)
-                        self._send_error(401, "Unauthorized: token rejected by provider")
-                        return False
-            except (URLError, OSError) as exc:
-                self._send_error(502, f"OAuth2 userinfo error: {exc}")
-                return False
-            except Exception as exc:
-                self._send_error(502, f"OAuth2 userinfo error: {exc}")
-                return False
+        except (URLError, OSError) as exc:
+            self._send_error(502, f"OAuth2 userinfo error: {exc}")
+            return False
+        except Exception as exc:
+            self._send_error(502, f"OAuth2 userinfo error: {exc}")
+            return False
 
         # Cache successful result
         _oauth2_cache[token] = (True, time.monotonic() + _OAUTH2_CACHE_TTL)
@@ -236,10 +218,17 @@ class SecretHandler(BaseHTTPRequestHandler):
         Returns True if the request is authenticated (or auth is disabled).
         Sends a 401/403 and returns False if authentication fails.
         """
-        # If no auth credentials are configured at all, skip auth
+        # If no auth credentials are configured and auth_mode is default,
+        # skip auth. But if auth_mode is explicitly non-default, enforce
+        # auth even without credentials (will return a specific error).
         has_any_auth = self.api_token or self.api_key or self.oauth_introspect_url or self.oauth_userinfo_url
-        if not has_any_auth:
+        if not has_any_auth and self.auth_mode == "bearer":
             return True
+
+        # If auth_mode is explicitly set to a non-default value but no
+        # credential is configured, the mode-specific branch below will
+        # return the appropriate 401 error. We must NOT short-circuit
+        # here — that would bypass auth entirely (security defect).
 
         mode = self.auth_mode
 
