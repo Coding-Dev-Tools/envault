@@ -1,15 +1,17 @@
 """HTTP API server for exposing decrypted secrets as a JSON API.
 
 Endpoints:
-    GET /secrets           -> list all secret keys (or filter by ?prefix=FOO)
-    GET /secrets/{key}     -> get decrypted value for a specific key
-    GET /health            -> connectivity check for the backing store
+ GET /secrets -> list all secret keys (or filter by ?prefix=FOO)
+ GET /secrets/{key} -> get decrypted value for a specific key
+ GET /health -> connectivity check for the backing store
+ GET /auth/info -> show configured auth methods and identity
 """
 
 from __future__ import annotations
 
 import json
 import os
+from envault.auth import BearerAuth, MultiAuth, ApiKeyAuth, OAuth2Auth, build_auth_from_env
 from envault.config import EnvaultConfig
 from envault.encrypt import KEY_ENV_VAR
 from envault.stores import LocalEnvStore, SecretStore, get_store
