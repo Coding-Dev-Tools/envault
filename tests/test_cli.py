@@ -759,4 +759,281 @@ def test_rotate_cli_actual(runner: CliRunner, tmp_path):
     assert "Rotated" in result.stdout
     content = env_file.read_text()
     assert "old_password" not in content
-    assert "KEY=value" in content  # other keys untouched
+    assert "KEY=value" in content # other keys untouched
+
+
+# ── History CLI ────────────────────────────────────────────────────────────────
+
+
+def test_history_no_git(tmp_path, runner: CliRunner):
+    """history on a directory without git should report no history gracefully."""
+    env_file = tmp_path / ".env.dev"
+    env_file.write_text("KEY=value\n")
+    import yaml
+    config = {
+        "project": "test",
+        "environments": [{"name": "dev", "env_file": str(env_file)}],
+    }
+    config_path = tmp_path / ".envault.yml"
+    with open(config_path, "w") as f:
+        yaml.dump(config, f)
+
+    result = runner.invoke(app, ["history", "dev", "--config", str(config_path)])
+    assert result.exit_code == 0
+    assert "No git history" in result.stdout
+
+
+def test_history_file_not_found(tmp_path, runner: CliRunner):
+    """history on a non-existent file should exit with error."""
+    import yaml
+    config = {
+        "project": "test",
+        "environments": [{"name": "dev", "env_file": str(tmp_path / "nonexistent.env")}],
+    }
+    config_path = tmp_path / ".envault.yml"
+    with open(config_path, "w") as f:
+        yaml.dump(config, f)
+
+    result = runner.invoke(app, ["history", "dev", "--config", str(config_path)])
+    assert result.exit_code != 0
+    assert "not found" in result.output.lower()
+
+
+def test_history_direct_file(tmp_path, runner: CliRunner):
+    """history --file should work with a direct path (no config needed)."""
+    env_file = tmp_path / "custom.env"
+    env_file.write_text("KEY=value\n")
+
+    # Without git, it should report no history but not crash
+    result = runner.invoke(app, ["history", "dev", "--file", str(env_file)])
+    assert result.exit_code == 0
+    assert "No git history" in result.stdout
+
+
+def test_history_json_output(tmp_path, runner: CliRunner):
+    """history --json should produce valid JSON output."""
+    import json as _json
+    env_file = tmp_path / ".env.dev"
+    env_file.write_text("KEY=value\n")
+    import yaml
+    config = {
+        "project": "test",
+        "environments": [{"name": "dev", "env_file": str(env_file)}],
+    }
+    config_path = tmp_path / ".envault.yml"
+    with open(config_path, "w") as f:
+        yaml.dump(config, f)
+
+    result = runner.invoke(app, ["history", "dev", "--json", "--config", str(config_path)])
+    assert result.exit_code == 0
+    # Strip \r from Windows line endings before JSON parsing
+    parsed = _json.loads(result.stdout.replace("\r\n", "\n").replace("\r", ""), strict=False)
+    assert "file" in parsed
+    assert "total_changes" in parsed
+    assert "changes" in parsed
+
+
+def test_history_key_filter(tmp_path, runner: CliRunner):
+    """history --key should filter to a specific key."""
+    env_file = tmp_path / ".env.dev"
+    env_file.write_text("KEY=value\nOTHER=thing\n")
+
+    result = runner.invoke(app, ["history", "dev", "--file", str(env_file), "--key", "KEY"])
+    assert result.exit_code == 0
+
+
+# ── Backup CLI ────────────────────────────────────────────────────────────────
+
+
+def test_backup_create_with_file(tmp_path, runner: CliRunner, monkeypatch):
+    """backup create --file should create a plain backup of the specified file."""
+    env_file = tmp_path / ".env.dev"
+    env_file.write_text("DB_PASSWORD=secret\nAPI_KEY=abc\n")
+    # Run backup from tmp_path so .envault-backups/ lands there
+    monkeypatch.chdir(tmp_path)
+
+    result = runner.invoke(app, ["backup", "create", "--file", str(env_file)])
+    assert result.exit_code == 0
+    assert "Backed up" in result.stdout
+
+
+def test_backup_create_file_not_found(tmp_path, runner: CliRunner, monkeypatch):
+    """backup create --file on non-existent file should error."""
+    monkeypatch.chdir(tmp_path)
+
+    result = runner.invoke(app, ["backup", "create", "--file", str(tmp_path / "nonexistent.env")])
+    assert result.exit_code != 0
+    assert "not found" in result.output.lower() or "error" in result.output.lower()
+
+
+def test_backup_create_encrypted(tmp_path, runner: CliRunner, monkeypatch):
+    """backup create --encrypt should create an encrypted backup."""
+    env_file = tmp_path / ".env.dev"
+    env_file.write_text("DB_PASSWORD=secret\nAPI_KEY=abc\n")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("ENVAULT_ENCRYPT_KEY", "test-password-123")
+
+    result = runner.invoke(app, ["backup", "create", "--file", str(env_file), "--encrypt"])
+    assert result.exit_code == 0
+    assert "encrypted" in result.stdout.lower() or "Backed up" in result.stdout
+
+    # Verify .envault-backups/ dir exists with a .locked file
+    backup_dir = tmp_path / ".envault-backups"
+    assert backup_dir.exists()
+    locked_files = list(backup_dir.glob("*.locked"))
+    assert len(locked_files) == 1
+
+
+def test_backup_list_empty(tmp_path, runner: CliRunner, monkeypatch):
+    """backup list with no backups should report no backups."""
+    monkeypatch.chdir(tmp_path)
+
+    result = runner.invoke(app, ["backup", "list"])
+    assert result.exit_code == 0
+    assert "No backups" in result.stdout
+
+
+def test_backup_list_after_create(tmp_path, runner: CliRunner, monkeypatch):
+    """backup list after creating a backup should show the backup."""
+    env_file = tmp_path / ".env.dev"
+    env_file.write_text("KEY=value\n")
+    monkeypatch.chdir(tmp_path)
+
+    # Create a backup first
+    create_result = runner.invoke(app, ["backup", "create", "--file", str(env_file)])
+    assert create_result.exit_code == 0
+
+    # List backups
+    list_result = runner.invoke(app, ["backup", "list"])
+    assert list_result.exit_code == 0
+    assert "backup" in list_result.stdout.lower()
+
+
+def test_backup_restore(tmp_path, runner: CliRunner, monkeypatch):
+    """backup restore should restore a previously backed-up file."""
+    env_file = tmp_path / ".env.dev"
+    env_file.write_text("KEY=original\nOTHER=thing\n")
+    monkeypatch.chdir(tmp_path)
+
+    # Create a backup
+    from envault.backup import list_backups
+    create_result = runner.invoke(app, ["backup", "create", "--file", str(env_file)])
+    assert create_result.exit_code == 0
+
+    # Get the backup name from the manifest
+    entries = list_backups(str(tmp_path))
+    assert len(entries) > 0
+    backup_name = entries[0].name
+
+    # Modify the original file
+    env_file.write_text("KEY=modified\n")
+
+    # Restore the backup
+    restore_result = runner.invoke(app, ["backup", "restore", backup_name])
+    assert restore_result.exit_code == 0
+    assert "Restored" in restore_result.stdout
+
+    # Verify content is restored
+    content = env_file.read_text()
+    assert "KEY=original" in content
+
+
+def test_backup_restore_not_found(tmp_path, runner: CliRunner, monkeypatch):
+    """backup restore with non-existent name should error."""
+    monkeypatch.chdir(tmp_path)
+
+    result = runner.invoke(app, ["backup", "restore", "nonexistent-backup-name"])
+    assert result.exit_code != 0
+    assert "not found" in result.output.lower()
+
+
+def test_backup_json_output(tmp_path, runner: CliRunner, monkeypatch):
+    """backup create --json should produce valid JSON."""
+    import json as _json
+    env_file = tmp_path / ".env.dev"
+    env_file.write_text("KEY=value\n")
+    monkeypatch.chdir(tmp_path)
+
+    result = runner.invoke(app, ["backup", "create", "--file", str(env_file), "--json"])
+    assert result.exit_code == 0
+    parsed = _json.loads(result.stdout.replace("\r\n", "\n").replace("\r", ""), strict=False)
+    assert "success_count" in parsed
+    assert parsed["success_count"] == 1
+
+
+# ── Security Scan ──────────────────────────────────────────────────────────
+
+
+def test_scan_clean_file(tmp_path, runner: CliRunner):
+    """scan on a clean file should report PASS and exit 0."""
+    env_file = tmp_path / ".env.prod"
+    env_file.write_text("DB_HOST=prod.example.com\nDB_PORT=5432\n")
+    result = runner.invoke(app, ["scan", str(env_file), "--no-permissions", "--no-gitignore"])
+    assert result.exit_code == 0
+    assert "PASS" in result.output
+
+
+def test_scan_weak_password(tmp_path, runner: CliRunner):
+    """scan should flag weak password."""
+    env_file = tmp_path / ".env"
+    env_file.write_text("DB_PASSWORD=password\n")
+    result = runner.invoke(app, ["scan", str(env_file), "--no-permissions", "--no-gitignore"])
+    assert "weak_secret" in result.output
+
+
+def test_scan_hardcoded_credential(tmp_path, runner: CliRunner):
+    """scan should flag hardcoded AWS key as critical and exit 1."""
+    env_file = tmp_path / ".env"
+    env_file.write_text("AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE\n")
+    result = runner.invoke(app, ["scan", str(env_file), "--no-permissions", "--no-gitignore"])
+    assert result.exit_code == 1
+    assert "hardcoded_credential" in result.output
+
+
+def test_scan_json_output(tmp_path, runner: CliRunner):
+    """scan --json should produce valid JSON with expected structure."""
+    import json as _json
+
+    env_file = tmp_path / ".env"
+    env_file.write_text("AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE\n")
+    result = runner.invoke(app, ["scan", str(env_file), "--json", "--no-permissions", "--no-gitignore"])
+    parsed = _json.loads(result.output.replace("\r\n", "\n").replace("\r", ""), strict=False)
+    assert isinstance(parsed, list)
+    assert len(parsed) == 1
+    entry = parsed[0]
+    assert "file" in entry
+    assert "pass_fail" in entry
+    assert "issues" in entry
+    assert entry["pass_fail"] == "FAIL"
+    assert entry["critical"] >= 1
+
+
+def test_scan_json_clean(tmp_path, runner: CliRunner):
+    """scan --json on a clean file should report PASS with zero critical/high."""
+    import json as _json
+
+    env_file = tmp_path / ".env"
+    env_file.write_text("APP_NAME=myapp\nAPP_PORT=8080\n")
+    result = runner.invoke(app, ["scan", str(env_file), "--json", "--no-permissions", "--no-gitignore"])
+    parsed = _json.loads(result.output.replace("\r\n", "\n").replace("\r", ""), strict=False)
+    assert parsed[0]["pass_fail"] == "PASS"
+    assert parsed[0]["critical"] == 0
+    assert parsed[0]["high"] == 0
+
+
+def test_scan_multiple_files(tmp_path, runner: CliRunner):
+    """scan with multiple files should audit each one."""
+    env1 = tmp_path / ".env.dev"
+    env1.write_text("AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE\n")
+    env2 = tmp_path / ".env.prod"
+    env2.write_text("DB_HOST=prod.example.com\n")
+    result = runner.invoke(app, ["scan", str(env1), str(env2), "--no-permissions", "--no-gitignore"])
+    assert result.exit_code == 1  # env1 has hardcoded credential
+    assert ".env.dev" in result.output
+    assert ".env.prod" in result.output
+
+
+def test_scan_nonexistent_file(runner: CliRunner):
+    """scan on a non-existent file should produce an info-level issue (visible with --verbose)."""
+    result = runner.invoke(app, ["scan", "/tmp/nonexistent_env_file_xyz.env", "--no-permissions", "--no-gitignore", "--verbose"])
+    assert "missing" in result.output or "does not exist" in result.output
