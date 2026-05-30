@@ -7,13 +7,14 @@ Endpoints:
  GET /auth/info -> show configured auth methods (no secrets exposed)
 
 Authentication:
- - Bearer token (Authorization: Bearer <token>) — static or OAuth2 introspection
+ - Bearer token (Authorization: Bearer <token>) -- static or OAuth2 introspection
  - API key (X-API-Key: <key>) header
  - Configurable via --auth-mode: "bearer", "api-key", "oauth2", "any"
 """
 
 from __future__ import annotations
 
+import base64
 import json
 import os
 import time
@@ -23,10 +24,9 @@ from envault.stores import LocalEnvStore, SecretStore, get_store
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 from typing import Any
+from urllib.error import URLError
 from urllib.parse import parse_qs, urlencode, urlparse
 from urllib.request import Request, urlopen
-from urllib.error import URLError
-
 
 # In-memory cache for OAuth2 token validation results
 _oauth2_cache: dict[str, tuple[bool, float]] = {}
@@ -45,8 +45,10 @@ class SecretHandler(BaseHTTPRequestHandler):
     auth_mode: str  # "bearer", "api-key", "oauth2", "any"
     oauth_introspect_url: str | None
     oauth_userinfo_url: str | None
+    oauth_client_id: str | None
+    oauth_client_secret: str | None
 
-    # ── Helpers ──────────────────────────────────────────────────────────────
+    # -- Helpers ---------------------------------------------------------------
 
     def _send_json(self, data: Any, status: int = 200) -> None:
         """Serialize *data* as JSON and send it with the appropriate headers."""
@@ -61,10 +63,10 @@ class SecretHandler(BaseHTTPRequestHandler):
         """Send a JSON error payload."""
         self._send_json({"error": message}, status=status)
 
-    # ── Auth ─────────────────────────────────────────────────────────────────
+    # -- Auth ------------------------------------------------------------------
 
     def _check_bearer_token(self) -> bool:
-        """Check Bearer token — static or OAuth2 introspection/userinfo.
+        """Check Bearer token -- static or OAuth2 introspection/userinfo.
 
         Returns True if authenticated.
         Returns False if auth failed (error already sent).
@@ -110,6 +112,15 @@ class SecretHandler(BaseHTTPRequestHandler):
                 return False
             del _oauth2_cache[token]
 
+        # Build headers -- include Basic auth if client credentials are configured
+        introspect_headers: dict[str, str] = {
+            "Content-Type": "application/x-www-form-urlencoded",
+        }
+        if self.oauth_client_id and self.oauth_client_secret:
+            credentials = f"{self.oauth_client_id}:{self.oauth_client_secret}"
+            encoded = base64.b64encode(credentials.encode("utf-8")).decode("utf-8")
+            introspect_headers["Authorization"] = f"Basic {encoded}"
+
         try:
             # Try using requests if available (better error handling / timeouts)
             import requests  # type: ignore[import-untyped]
@@ -117,7 +128,7 @@ class SecretHandler(BaseHTTPRequestHandler):
             resp = requests.post(
                 self.oauth_introspect_url,
                 data={"token": token},
-                headers={"Content-Type": "application/x-www-form-urlencoded"},
+                headers=introspect_headers,
                 timeout=5,
             )
             if resp.status_code != 200:
@@ -132,7 +143,7 @@ class SecretHandler(BaseHTTPRequestHandler):
                 req = Request(
                     self.oauth_introspect_url,
                     data=body,
-                    headers={"Content-Type": "application/x-www-form-urlencoded"},
+                    headers=introspect_headers,
                     method="POST",
                 )
                 with urlopen(req, timeout=5) as resp:  # noqa: S310
@@ -259,7 +270,7 @@ class SecretHandler(BaseHTTPRequestHandler):
             if api_key_header and self.api_key:
                 if api_key_header == self.api_key:
                     return True
-                # API key was provided but wrong — return error immediately
+                # API key was provided but wrong -- return error immediately
                 self._send_error(403, "Forbidden: invalid API key")
                 return False
 
@@ -269,9 +280,9 @@ class SecretHandler(BaseHTTPRequestHandler):
         # Default: "bearer" mode
         return self._check_bearer_token()
 
-    # ── Routing ──────────────────────────────────────────────────────────────
+    # -- Routing ---------------------------------------------------------------
 
-    def do_GET(self) -> None:  # noqa: N802 – stdlib naming convention
+    def do_GET(self) -> None:  # noqa: N802 -- stdlib naming convention
         parsed = urlparse(self.path)
         path = parsed.path.rstrip("/") or "/"
         query = parse_qs(parsed.query)
@@ -298,10 +309,10 @@ class SecretHandler(BaseHTTPRequestHandler):
         else:
             self._send_error(404, "Not found")
 
-    # ── Endpoints ────────────────────────────────────────────────────────────
+    # -- Endpoints -------------------------------------------------------------
 
     def _handle_health(self) -> None:
-        """GET /health — connectivity check for the backing store."""
+        """GET /health -- connectivity check for the backing store."""
         store = self.store
         checks: dict[str, Any] = {}
 
@@ -325,7 +336,7 @@ class SecretHandler(BaseHTTPRequestHandler):
         self._send_json({"status": overall, "checks": checks})
 
     def _handle_auth_info(self) -> None:
-        """GET /auth/info — show configured auth methods (no secrets exposed).
+        """GET /auth/info -- show configured auth methods (no secrets exposed).
 
         This endpoint is always accessible (like /health) so clients can
         discover what auth methods the server accepts before making
@@ -348,7 +359,7 @@ class SecretHandler(BaseHTTPRequestHandler):
         })
 
     def _handle_secrets_list(self, query: dict[str, list[str]]) -> None:
-        """GET /secrets — list keys, optionally filtered by ?prefix=."""
+        """GET /secrets -- list keys, optionally filtered by ?prefix=."""
         prefix = query.get("prefix", [""])[0]
         try:
             keys = self.store.list_keys(prefix=prefix)
@@ -358,7 +369,7 @@ class SecretHandler(BaseHTTPRequestHandler):
         self._send_json({"keys": keys, "count": len(keys)})
 
     def _handle_secrets_get(self, key: str) -> None:
-        """GET /secrets/{key} — get decrypted value for a single key."""
+        """GET /secrets/{key} -- get decrypted value for a single key."""
         if not key:
             self._send_error(400, "Key is required")
             return
@@ -372,10 +383,10 @@ class SecretHandler(BaseHTTPRequestHandler):
             return
         self._send_json({"key": key, "value": value})
 
-    # ── Logging ──────────────────────────────────────────────────────────────
+    # -- Logging ---------------------------------------------------------------
 
     def log_message(self, format: str, *args: Any) -> None:  # noqa: A002
-        """Quiet default logging — only log at debug level if needed."""
+        """Quiet default logging -- only log at debug level if needed."""
         # Suppress per-request logging to keep CLI output clean.
         pass
 
@@ -401,6 +412,8 @@ def create_handler(
     auth_mode: str = "bearer",
     oauth_introspect_url: str | None = None,
     oauth_userinfo_url: str | None = None,
+    oauth_client_id: str | None = None,
+    oauth_client_secret: str | None = None,
 ):
     """Return a BaseHTTPRequestHandler subclass bound to the given store/config.
 
@@ -419,6 +432,8 @@ def create_handler(
     _Handler.auth_mode = auth_mode  # type: ignore[attr-defined]
     _Handler.oauth_introspect_url = oauth_introspect_url  # type: ignore[attr-defined]
     _Handler.oauth_userinfo_url = oauth_userinfo_url  # type: ignore[attr-defined]
+    _Handler.oauth_client_id = oauth_client_id  # type: ignore[attr-defined]
+    _Handler.oauth_client_secret = oauth_client_secret  # type: ignore[attr-defined]
     return _Handler
 
 
@@ -433,6 +448,8 @@ def run_server(
     auth_mode: str = "bearer",
     oauth_introspect_url: str | None = None,
     oauth_userinfo_url: str | None = None,
+    oauth_client_id: str | None = None,
+    oauth_client_secret: str | None = None,
 ) -> None:
     """Start the HTTP server for the secrets API.
 
@@ -443,7 +460,7 @@ def run_server(
     port : int
         Port to bind (default 8080).
     host : str
-        Bind address (default "127.0.0.1" — localhost only for security).
+        Bind address (default "127.0.0.1" -- localhost only for security).
     encrypt_key : str | None
         Encryption key; if *None* the key is read from ENVAULT_ENCRYPT_KEY or
         prompted interactively.
@@ -470,6 +487,12 @@ def run_server(
         OAuth2/OIDC userinfo endpoint URL. If *None*, reads from
         ENVAULT_OAUTH_USERINFO_URL env var. When set, Bearer tokens are
         validated by GETting this endpoint.
+    oauth_client_id : str | None
+        OAuth2 client ID for authenticated introspection. If *None*, reads
+        from ENVAULT_OAUTH_CLIENT_ID env var.
+    oauth_client_secret : str | None
+        OAuth2 client secret for authenticated introspection. If *None*, reads
+        from ENVAULT_OAUTH_CLIENT_SECRET env var.
     """
 
     # Resolve encryption key (same auth model as decrypt command)
@@ -493,6 +516,13 @@ def run_server(
     # Resolve OAuth2 userinfo URL
     if oauth_userinfo_url is None:
         oauth_userinfo_url = os.environ.get("ENVAULT_OAUTH_USERINFO_URL")
+
+    # Resolve OAuth2 client credentials (for authenticated introspection)
+    if oauth_client_id is None:
+        oauth_client_id = os.environ.get("ENVAULT_OAUTH_CLIENT_ID")
+
+    if oauth_client_secret is None:
+        oauth_client_secret = os.environ.get("ENVAULT_OAUTH_CLIENT_SECRET")
 
     # Validate auth_mode
     valid_modes = ("bearer", "api-key", "oauth2", "any")
@@ -531,6 +561,8 @@ def run_server(
         auth_mode=auth_mode,
         oauth_introspect_url=oauth_introspect_url,
         oauth_userinfo_url=oauth_userinfo_url,
+        oauth_client_id=oauth_client_id,
+        oauth_client_secret=oauth_client_secret,
     )
     server = HTTPServer((host, port), handler_class)
 
