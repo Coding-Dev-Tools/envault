@@ -625,6 +625,117 @@ def test_audit_cli_filter_key(runner: CliRunner, tmp_path):
     assert "API_KEY" not in result.stdout
 
 
+# ── Security Check CLI ──────────────────────────────────────────────────────────
+
+
+def test_check_file_clean(runner: CliRunner, tmp_path):
+    """check --file on a clean .env should report no issues."""
+    env_file = tmp_path / ".env"
+    env_file.write_text("DB_HOST=prod.example.com\nDB_PORT=5432\nAPP_ENV=production\n")
+    result = runner.invoke(app, ["check", "--file", str(env_file)])
+    assert result.exit_code == 0
+    assert "No security issues" in result.stdout or "0 critical" in result.stdout.lower() or "Issues: 0" in result.stdout
+
+
+def test_check_file_weak_secret(runner: CliRunner, tmp_path):
+    """check --file should detect weak placeholder secrets."""
+    env_file = tmp_path / ".env"
+    env_file.write_text("DB_PASSWORD=changeme\nDB_HOST=localhost\n")
+    result = runner.invoke(app, ["check", "--file", str(env_file)])
+    assert result.exit_code == 1  # critical issue → exit 1
+    assert "ENV-WEAK" in result.stdout or "Weak" in result.stdout or "weak" in result.stdout.lower()
+
+
+def test_check_file_short_secret(runner: CliRunner, tmp_path):
+    """check --file should detect short secrets."""
+    env_file = tmp_path / ".env"
+    env_file.write_text("API_TOKEN=short1\nDB_HOST=localhost\n")
+    result = runner.invoke(app, ["check", "--file", str(env_file)])
+    assert "ENV-SHORT" in result.stdout or "Short" in result.stdout or "short" in result.stdout.lower()
+
+
+def test_check_file_duplicate_keys(runner: CliRunner, tmp_path):
+    """check --file should detect duplicate keys."""
+    env_file = tmp_path / ".env"
+    env_file.write_text("DB_HOST=first\nDB_HOST=second\n")
+    result = runner.invoke(app, ["check", "--file", str(env_file)])
+    assert "ENV-DUP" in result.stdout or "Duplicate" in result.stdout or "duplicate" in result.stdout.lower()
+
+
+def test_check_json_output(runner: CliRunner, tmp_path):
+    """check --file --json should output valid JSON with findings."""
+    import json
+    env_file = tmp_path / ".env"
+    env_file.write_text("DB_PASSWORD=changeme\nDB_HOST=localhost\n")
+    result = runner.invoke(app, ["check", "--file", str(env_file), "--json"])
+    assert result.exit_code == 1
+    # Parse the JSON output
+    data = json.loads(result.stdout)
+    assert data["critical"] >= 1
+    assert len(data["findings"]) >= 1
+    assert any(f["rule_id"] == "ENV-WEAK" for f in data["findings"])
+
+
+def test_check_with_env_from_config(runner: CliRunner, tmp_path):
+    """check --env should use config to find the env file."""
+    import yaml
+    env_file = tmp_path / ".env.dev"
+    env_file.write_text("DB_PASSWORD=changeme\nDB_HOST=localhost\n")
+    config = {
+        "project": "test",
+        "environments": [{"name": "dev", "env_file": str(env_file)}],
+    }
+    config_path = tmp_path / ".envault.yml"
+    with open(config_path, "w") as f:
+        yaml.dump(config, f)
+
+    result = runner.invoke(app, ["check", "--env", "dev", "--config", str(config_path)])
+    assert result.exit_code == 1
+    assert "ENV-WEAK" in result.stdout or "weak" in result.stdout.lower()
+
+
+def test_check_env_not_found(runner: CliRunner, tmp_path):
+    """check --env with nonexistent env should error."""
+    import yaml
+    config = {
+        "project": "test",
+        "environments": [{"name": "dev", "env_file": str(tmp_path / ".env.dev")}],
+    }
+    config_path = tmp_path / ".envault.yml"
+    with open(config_path, "w") as f:
+        yaml.dump(config, f)
+
+    result = runner.invoke(app, ["check", "--env", "staging", "--config", str(config_path)])
+    assert result.exit_code != 0
+
+
+def test_check_strict_mode(runner: CliRunner, tmp_path):
+    """check --strict should promote warnings to critical."""
+    import json
+    env_file = tmp_path / ".env"
+    env_file.write_text("API_TOKEN=short1\nDB_HOST=localhost\n")
+    result = runner.invoke(app, ["check", "--file", str(env_file), "--strict", "--json"])
+    assert result.exit_code == 1  # strict promotes warnings to critical
+    data = json.loads(result.stdout)
+    assert data["critical"] >= 1  # short secret promoted to critical
+
+
+def test_check_no_env_files_in_config(runner: CliRunner, tmp_path):
+    """check with no matching env files should report cleanly."""
+    import yaml
+    config = {
+        "project": "test",
+        "environments": [{"name": "dev", "env_file": str(tmp_path / ".nonexistent")}],
+    }
+    config_path = tmp_path / ".envault.yml"
+    with open(config_path, "w") as f:
+        yaml.dump(config, f)
+
+    result = runner.invoke(app, ["check", "--config", str(config_path)])
+    assert result.exit_code == 0
+    assert "No .env files found" in result.output
+
+
 # ── Rotate (Single Key) ───────────────────────────────────────────────────────
 
 

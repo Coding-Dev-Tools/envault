@@ -11,7 +11,6 @@ from envault.diff import diff_env_files, format_diff, format_diff_json
 from envault.encrypt import decrypt_env, encrypt_env
 from envault.rotate import rotate_env_var
 from envault.security import (
-    SecurityAuditResult,
     format_security_report,
     run_security_audit,
 )

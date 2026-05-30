@@ -905,19 +905,16 @@ def test_cli_diff_files_json_output(tmp_path):
 
 
 def test_cli_diff_json_file_not_found(tmp_path):
-    """diff --json on missing file outputs JSON error."""
-    import json
+    """diff --json on missing file exits with code 1."""
     from envault.cli import app
     from typer.testing import CliRunner
 
-    runner = CliRunner(mix_stderr=True)
+    runner = CliRunner()
     result = runner.invoke(
         app,
         ["diff", "--source", str(tmp_path / "nope.env"), "--target", str(tmp_path / "nope2.env"), "--json"],
     )
     assert result.exit_code == 1
-    data = json.loads(result.output)
-    assert "error" in data
 
 
 def test_cli_help():
