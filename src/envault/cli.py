@@ -5,13 +5,13 @@ from __future__ import annotations
 import typer
 from envault import __version__
 from envault.audit import AuditLogger
-from envault.security_audit import SecurityAuditResult, audit_env_file, format_audit_report
+from envault.backup import backup_env_file, format_backup_list, list_backups, restore_backup
 from envault.config import EnvaultConfig, init_config
 from envault.diff import diff_env_files, format_diff
 from envault.encrypt import decrypt_env, encrypt_env
-from envault.backup import backup_env_file, format_backup_list, list_backups, restore_backup
 from envault.history import format_history, get_env_history
 from envault.rotate import rotate_env_var
+from envault.security_audit import SecurityAuditResult, audit_env_file, format_audit_report
 from envault.serve import run_server
 from envault.stores import get_store
 from envault.sync import sync_env_files

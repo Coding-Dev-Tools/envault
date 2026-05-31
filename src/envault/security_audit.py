@@ -7,7 +7,6 @@ import stat
 from dataclasses import dataclass, field
 from pathlib import Path
 
-
 # ── Issue types ──────────────────────────────────────────────────────────────
 
 @dataclass
@@ -488,11 +487,11 @@ def format_audit_report(results: list[SecurityAuditResult], *, verbose: bool = F
     overall_pass = True
 
     for result in results:
-        lines.append(f"")
+        lines.append("")
         lines.append(f"  Security Audit: {result.file_path}")
 
         if not result.issues:
-            lines.append(f"  ✓ No issues found")
+            lines.append("  ✓ No issues found")
             continue
 
         issues_to_show = result.sorted_issues()
@@ -520,12 +519,12 @@ def format_audit_report(results: list[SecurityAuditResult], *, verbose: bool = F
             overall_pass = False
 
     # Summary
-    lines.append(f"")
+    lines.append("")
     if not results:
-        lines.append(f"  No files audited.")
+        lines.append("  No files audited.")
     else:
         status = "PASS ✓" if overall_pass else "FAIL ✗"
-        lines.append(f"  ── Summary ──")
+        lines.append("  ── Summary ──")
         lines.append(f"  {status}  {len(results)} file(s)  {total_issues} issue(s)")
         if total_critical or total_high:
             lines.append(f"  🔴 Critical: {total_critical}  🟠 High: {total_high}  🟡 Medium: {sum(r.medium_count for r in results)}  🔵 Low: {sum(r.low_count for r in results)}")

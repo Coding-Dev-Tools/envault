@@ -15,8 +15,8 @@ import json
 import os
 import time
 from typing import Any
-from urllib.request import Request, urlopen
 from urllib.error import URLError
+from urllib.request import Request, urlopen
 
 
 class AuthResult:
@@ -199,7 +199,7 @@ class OAuth2Auth:
             if isinstance(audiences, str):
                 audiences = [audiences]
             if self._required_audience not in audiences:
-                return AuthResult.fail(403, f"Forbidden: invalid audience")
+                return AuthResult.fail(403, "Forbidden: invalid audience")
 
         identity = claims.get("sub") or claims.get("email") or claims.get("client_id") or "oauth2:user"
 

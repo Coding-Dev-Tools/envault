@@ -1,17 +1,15 @@
 """Tests for security_audit module — envault audit-security command."""
 
 import stat
-
 from envault.security_audit import (
     SecurityAuditResult,
     SecurityIssue,
+    _check_duplicate_keys,
+    _is_hardcoded_secret,
+    _is_weak_value,
     audit_env_file,
     format_audit_report,
-    _is_weak_value,
-    _is_hardcoded_secret,
-    _check_duplicate_keys,
 )
-
 
 # ── SecurityIssue ───────────────────────────────────────────────────────────
 
