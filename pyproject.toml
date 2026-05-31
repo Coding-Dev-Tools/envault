@@ -75,7 +75,7 @@ line-length = 120
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "UP", "B", "SIM"]
 ignore = ["E501", "B008"]
-exclude = ["tests/debug_*.py", "tests/tmp*.py"]
+exclude = ["tests/debug_*.py", "tests/tmp*.py", "tests/test_cli_debug*.py", "tests/test_*_debug*.py", "tests/test_*_temp*.py"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["*"]

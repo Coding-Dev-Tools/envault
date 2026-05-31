@@ -33,3 +33,6 @@ htmlcov/
 # Temp/debug test files
 tests/debug_*.py
 tests/tmp*.py
+tests/test_cli_debug*.py
+tests/test_*_debug*.py
+tests/test_*_temp*.py
