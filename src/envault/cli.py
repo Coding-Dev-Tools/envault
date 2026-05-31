@@ -5,9 +5,12 @@ from __future__ import annotations
 import typer
 from envault import __version__
 from envault.audit import AuditLogger
+from envault.security_audit import SecurityAuditResult, audit_env_file, format_audit_report
 from envault.config import EnvaultConfig, init_config
 from envault.diff import diff_env_files, format_diff
 from envault.encrypt import decrypt_env, encrypt_env
+from envault.backup import backup_env_file, format_backup_list, list_backups, restore_backup
+from envault.history import format_history, get_env_history
 from envault.rotate import rotate_env_var
 from envault.serve import run_server
 from envault.stores import get_store
@@ -82,6 +85,7 @@ def diff(
     target_file: str | None = typer.Option(None, "--target", "-t", help="Target .env file path (overrides env name)"),
     config_path: str = typer.Option("", "--config", "-c", help="Config file path"),
     fail_on_missing: bool = typer.Option(False, "--fail-on-missing", help="Exit with code 1 if source has keys not in target"),
+    json_output: bool = typer.Option(False, "--json", help="Output result as JSON for programmatic use"),
 ):
     """Diff environment variables between two environments or .env files."""
     config = load_config(config_path)
@@ -99,9 +103,12 @@ def diff(
         err_console.print(f"[red]Error:[/red] {e}")
         raise typer.Exit(code=1) from None
 
-    console.print(format_diff(result, label_s, label_t))
+    if json_output:
+        console.print(result.to_json(source_label=label_s, target_label=label_t))
+    else:
+        console.print(format_diff(result, label_s, label_t))
 
-    if result.has_differences:
+    if not json_output and result.has_differences:
         console.print(f"\nTotal: {result.total_differences} difference(s)")
 
     if fail_on_missing and result.only_in_source:
@@ -115,6 +122,7 @@ def diff_files(
     file1: str = typer.Argument(..., help="First .env file"),
     file2: str = typer.Argument(..., help="Second .env file"),
     fail_on_missing: bool = typer.Option(False, "--fail-on-missing", help="Exit with code 1 if source has keys not in target"),
+    json_output: bool = typer.Option(False, "--json", help="Output result as JSON for programmatic use"),
 ):
     """Diff two .env files directly (no config needed)."""
     try:
@@ -122,8 +130,11 @@ def diff_files(
     except FileNotFoundError as e:
         err_console.print(f"[red]Error:[/red] {e}")
         raise typer.Exit(code=1) from None
-    console.print(format_diff(result, Path(file1).name, Path(file2).name))
-    if result.has_differences:
+    if json_output:
+        console.print(result.to_json(source_label=Path(file1).name, target_label=Path(file2).name))
+    else:
+        console.print(format_diff(result, Path(file1).name, Path(file2).name))
+    if not json_output and result.has_differences:
         console.print(f"\nTotal: {result.total_differences} difference(s)")
 
     if fail_on_missing and result.only_in_source:
@@ -457,6 +468,207 @@ def audit(
         )
 
     console.print(table)
+
+
+# ── Security Scan ──────────────────────────────────────────────────────────
+
+@app.command()
+def scan(
+    files: list[str] = typer.Argument(..., help="One or more .env files to scan"),
+    verbose: bool = typer.Option(False, "--verbose", "-v", help="Show info-level findings and suggestions"),
+    json_output: bool = typer.Option(False, "--json", help="Output results as JSON"),
+    no_permissions: bool = typer.Option(False, "--no-permissions", help="Skip file permission checks"),
+    no_gitignore: bool = typer.Option(False, "--no-gitignore", help="Skip .gitignore checks"),
+    config_path: str = typer.Option("", "--config", "-c", help="Config file path"),
+):
+    """Scan .env files for security issues (weak secrets, hardcoded credentials, permissions, gitignore)."""
+    results: list[SecurityAuditResult] = []
+    for f in files:
+        result = audit_env_file(
+            f,
+            check_permissions=not no_permissions,
+            check_gitignore=not no_gitignore,
+        )
+        results.append(result)
+
+    if json_output:
+        import json as _json
+        output = []
+        for r in results:
+            entry = {
+                "file": r.file_path,
+                "pass_fail": r.pass_fail,
+                "total_issues": r.total_issues,
+                "critical": r.critical_count,
+                "high": r.high_count,
+                "medium": r.medium_count,
+                "low": r.low_count,
+                "info": r.info_count,
+                "issues": [
+                    {
+                        "severity": i.severity,
+                        "category": i.category,
+                        "key": i.key,
+                        "message": i.message,
+                        "suggestion": i.suggestion,
+                    }
+                    for i in r.sorted_issues()
+                ],
+            }
+            output.append(entry)
+        console.print(_json.dumps(output, indent=2))
+    else:
+        report = format_audit_report(results, verbose=verbose)
+        console.print(report)
+
+    # Exit with non-zero code if critical or high issues found
+    if any(r.has_critical_or_high for r in results):
+        raise typer.Exit(1)
+
+
+# ── History ──────────────────────────────────────────────────────────────────
+
+@app.command()
+def history(
+    env: str = typer.Argument("dev", help="Environment name from config"),
+    file: str | None = typer.Option(None, "--file", "-f", help="Direct .env file path (overrides env name)"),
+    key: str | None = typer.Option(None, "--key", "-k", help="Filter changes to a specific key"),
+    max_commits: int = typer.Option(50, "--max-commits", "-n", help="Maximum number of commits to inspect"),
+    verbose: bool = typer.Option(False, "--verbose", "-v", help="Show old/new values in output"),
+    json_output: bool = typer.Option(False, "--json", help="Output result as JSON for programmatic use"),
+    config_path: str = typer.Option("", "--config", "-c", help="Config file path"),
+):
+    """Show git change history for an .env file.
+
+    Walks the git log for the given .env file and shows each key-level
+    change (added, removed, changed) per commit.
+    """
+    config = load_config(config_path)
+
+    if file:
+        env_file = Path(file)
+    else:
+        env_file = config.get_env_path(env)
+
+    if not env_file.exists():
+        err_console.print(f"[red]Error:[/red] Environment file '{env_file}' not found")
+        raise typer.Exit(1)
+
+    result = get_env_history(
+        env_file,
+        max_commits=max_commits,
+        key_filter=key,
+    )
+
+    if json_output:
+        console.print(result.to_json(mask_values=not verbose))
+    else:
+        console.print(format_history(result, verbose=verbose))
+
+
+# ── Backup ───────────────────────────────────────────────────────────────────
+
+backup_app = typer.Typer(name="backup", help="Backup and restore .env files.")
+app.add_typer(backup_app)
+
+
+@backup_app.command("create")
+def backup_create(
+    env: str | None = typer.Argument(None, help="Environment name from config"),
+    file: str | None = typer.Option(None, "--file", "-f", help="Direct .env file path (overrides env name)"),
+    all_envs: bool = typer.Option(False, "--all", "-a", help="Backup all configured environments"),
+    encrypt: bool = typer.Option(False, "--encrypt", "-e", help="Encrypt backup with Fernet"),
+    password: str | None = typer.Option(None, "--password", "-p", help="Encryption password (prompted if omitted)"),
+    json_output: bool = typer.Option(False, "--json", help="Output result as JSON"),
+    config_path: str = typer.Option("", "--config", "-c", help="Config file path"),
+):
+    """Create an encrypted backup of .env file(s)."""
+    config = load_config(config_path)
+
+    files_to_backup: list[Path] = []
+
+    if all_envs:
+        for env_cfg in config.environments:
+            p = Path(env_cfg.env_file)
+            if p.exists():
+                files_to_backup.append(p)
+            else:
+                err_console.print(f"[yellow]⚠[/yellow] Skipping {env_cfg.name}: file '{p}' not found")
+    elif file:
+        files_to_backup.append(Path(file))
+    elif env:
+        files_to_backup.append(config.get_env_path(env))
+    else:
+        err_console.print("[red]Error:[/red] Provide --env, --file, or --all")
+        raise typer.Exit(1)
+
+    from envault.backup import BackupResult
+    result = BackupResult()
+
+    for f in files_to_backup:
+        try:
+            entry = backup_env_file(f, encrypt=encrypt, password=password)
+            result.backups.append(entry)
+        except FileNotFoundError as e:
+            result.errors.append(str(e))
+        except Exception as e:
+            result.errors.append(str(e))
+
+    if json_output:
+        console.print(result.to_json())
+    else:
+        for entry in result.backups:
+            enc_tag = " (encrypted)" if entry.encrypted else ""
+            console.print(f"[green]✓[/green] Backed up {entry.source_file}{enc_tag} → {entry.backup_path}")
+        for err in result.errors:
+            err_console.print(f"[red]Error:[/red] {err}")
+
+    if result.errors:
+        raise typer.Exit(1)
+
+
+@backup_app.command("list")
+def backup_list(
+    json_output: bool = typer.Option(False, "--json", help="Output result as JSON"),
+    config_path: str = typer.Option("", "--config", "-c", help="Config file path"),
+):
+    """List existing backups."""
+    entries = list_backups()
+
+    if json_output:
+        import json
+        console.print(json.dumps([e.to_dict() for e in entries], indent=2))
+    else:
+        if not entries:
+            console.print("[yellow]No backups found[/yellow]")
+            raise typer.Exit(0)
+
+        console.print(format_backup_list(entries))
+        console.print(f"\n{len(entries)} backup(s) in .envault-backups/")
+
+
+@backup_app.command("restore")
+def backup_restore(
+    name: str = typer.Argument(..., help="Backup name to restore"),
+    target: str | None = typer.Option(None, "--target", "-t", help="Target file path (defaults to original)"),
+    password: str | None = typer.Option(None, "--password", "-p", help="Decryption password (prompted if omitted)"),
+    json_output: bool = typer.Option(False, "--json", help="Output result as JSON"),
+    config_path: str = typer.Option("", "--config", "-c", help="Config file path"),
+):
+    """Restore a backup by name."""
+    try:
+        restored_path = restore_backup(name, target_path=target, password=password)
+        if json_output:
+            import json
+            console.print(json.dumps({"restored_to": str(restored_path)}))
+        else:
+            console.print(f"[green]✓[/green] Restored → {restored_path}")
+    except ValueError as e:
+        err_console.print(f"[red]Error:[/red] {e}")
+        raise typer.Exit(1)
+    except FileNotFoundError as e:
+        err_console.print(f"[red]Error:[/red] {e}")
+        raise typer.Exit(1)
 
 
 # ── Serve (HTTP API) ──────────────────────────────────────────────────────────
