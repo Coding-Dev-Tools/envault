@@ -681,8 +681,11 @@ def backup_restore(
 def serve(
     port: int = typer.Option(8080, "--port", "-p", help="Port to listen on"),
     host: str = typer.Option("127.0.0.1", "--host", "-H", help="Bind address (default: localhost only)"),
-    password: str | None = typer.Option(None, "--password", "-k", help="Encryption password (prompted if omitted, or use ENVAULT_ENCRYPT_KEY)"),
-    api_key: str | None = typer.Option(None, "--api-key", help="Bearer token for API auth (or set ENVAULT_API_KEY)"),
+    password: str | None = typer.Option(
+        None, "--password", "-k",
+        help="Encryption password (prompted if omitted, or use ENVAULT_ENCRYPT_KEY)"),
+    api_key: str | None = typer.Option(
+        None, "--api-key", help="Bearer token for API auth (or set ENVAULT_API_KEY)"),
     store: str | None = typer.Option(None, "--store", "-s", help="Named store from config to use"),
     config_path: str = typer.Option("", "--config", "-c", help="Config file path"),
     api_token: str | None = typer.Option(

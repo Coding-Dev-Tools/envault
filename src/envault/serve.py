@@ -430,11 +430,11 @@ def _get_api_key(cli_key: str | None = None) -> str | None:
 
 
 def create_handler(
-    store: SecretStore,
-    config: EnvaultConfig,
-    encrypt_key: str | None = None,
-    api_key: str | None = None,
-):
+     store: SecretStore,
+     config: EnvaultConfig,
+     encrypt_key: str | None = None,
+     api_key: str | None = None,
+ ):
     """Return a BaseHTTPRequestHandler subclass bound to the given store/config.
 
     This avoids mutating the class-level attributes on SecretHandler directly,
