@@ -31,9 +31,16 @@ Thumbs.db
 .coverage
 htmlcov/
 
-# Temp/debug test files
-tests/debug_*.py
-tests/tmp*.py
-tests/test_cli_debug*.py
-tests/test_*_debug*.py
-tests/test_*_temp*.py
+# Merge artifacts and cache (added by workspace stabilization)
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+*.orig
+*.BACKUP.*
+*.BASE.*
+*.LOCAL.*
+*.REMOTE.*
+local.db
+*.sqlite3
