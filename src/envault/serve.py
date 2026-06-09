@@ -1,15 +1,24 @@
 """HTTP API server for exposing decrypted secrets as a JSON API.
 
 Endpoints:
-    GET /secrets           -> list all secret keys (or filter by ?prefix=FOO)
-    GET /secrets/{key}     -> get decrypted value for a specific key
-    GET /health            -> connectivity check for the backing store
+ GET /secrets -> list all secret keys (or filter by ?prefix=FOO)
+ GET /secrets/{key} -> get decrypted value for a specific key
+ GET /health -> connectivity check for the backing store
+
+Security:
+ - Default bind address is 127.0.0.1 (localhost only).
+ - If --api-key is provided, all endpoints (except /health) require
+   an Authorization: Bearer <api-key> header. Requests without a
+   valid token receive 401 Unauthorized.
+ - If --api-key is not provided, a warning is printed at startup
+   recommending authentication for production use.
 """
 
 from __future__ import annotations
 
 import json
 import os
+import secrets as _secrets
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from pathlib import Path
 from typing import Any
@@ -19,6 +28,9 @@ from envault.config import EnvaultConfig, SecretStoreConfig
 from envault.encrypt import KEY_ENV_VAR
 from envault.stores import SecretStore, LocalEnvStore, get_store
 
+# Environment variable for API authentication key
+API_KEY_ENV_VAR = "ENVAULT_API_KEY"
+
 
 class SecretHandler(BaseHTTPRequestHandler):
     """HTTP request handler for the envault secrets API."""
@@ -27,6 +39,7 @@ class SecretHandler(BaseHTTPRequestHandler):
     store: SecretStore
     config: EnvaultConfig
     encrypt_key: str | None
+    api_key: str | None  # Bearer token for API auth; None = auth disabled
 
     # ── Helpers ──────────────────────────────────────────────────────────────
 
@@ -43,6 +56,25 @@ class SecretHandler(BaseHTTPRequestHandler):
         """Send a JSON error payload."""
         self._send_json({"error": message}, status=status)
 
+    def _check_auth(self) -> bool:
+        """Validate the Bearer token if API auth is enabled.
+
+        Returns True if the request is authorized (or auth is disabled).
+        Returns False if auth is required but missing/invalid (and sends 401).
+        """
+        if not self.api_key:
+            # Auth not configured — allow all requests
+            return True
+
+        auth_header = self.headers.get("Authorization", "")
+        if auth_header.startswith("Bearer "):
+            token = auth_header[len("Bearer "):]
+            if _secrets.compare_digest(token, self.api_key):
+                return True
+
+        self._send_error(401, "Unauthorized: valid Bearer token required")
+        return False
+
     # ── Routing ──────────────────────────────────────────────────────────────
 
     def do_GET(self) -> None:  # noqa: N802 – stdlib naming convention
@@ -51,10 +83,15 @@ class SecretHandler(BaseHTTPRequestHandler):
         query = parse_qs(parsed.query)
 
         if path == "/health":
+            # /health is always accessible (useful for load balancers)
             self._handle_health()
         elif path == "/secrets":
+            if not self._check_auth():
+                return
             self._handle_secrets_list(query)
         elif path.startswith("/secrets/"):
+            if not self._check_auth():
+                return
             key = path[len("/secrets/"):]
             self._handle_secrets_get(key)
         else:
@@ -131,7 +168,22 @@ def _get_encrypt_key() -> str | None:
         return None
 
 
-def create_handler(store: SecretStore, config: EnvaultConfig, encrypt_key: str | None = None):
+def _get_api_key(cli_key: str | None = None) -> str | None:
+    """Resolve the API authentication key.
+
+    Priority: explicit CLI flag > ENVAULT_API_KEY env var > None (auth disabled).
+    """
+    if cli_key:
+        return cli_key
+    return os.environ.get(API_KEY_ENV_VAR) or None
+
+
+def create_handler(
+    store: SecretStore,
+    config: EnvaultConfig,
+    encrypt_key: str | None = None,
+    api_key: str | None = None,
+):
     """Return a BaseHTTPRequestHandler subclass bound to the given store/config.
 
     This avoids mutating the class-level attributes on SecretHandler directly,
@@ -144,15 +196,17 @@ def create_handler(store: SecretStore, config: EnvaultConfig, encrypt_key: str |
     _Handler.store = store  # type: ignore[attr-defined]
     _Handler.config = config  # type: ignore[attr-defined]
     _Handler.encrypt_key = encrypt_key  # type: ignore[attr-defined]
+    _Handler.api_key = api_key  # type: ignore[attr-defined]
     return _Handler
 
 
 def run_server(
     config: EnvaultConfig,
     port: int = 8080,
-    host: str = "0.0.0.0",
+    host: str = "127.0.0.1",
     encrypt_key: str | None = None,
     store_name: str | None = None,
+    api_key: str | None = None,
 ) -> None:
     """Start the HTTP server for the secrets API.
 
@@ -163,12 +217,17 @@ def run_server(
     port : int
         Port to bind (default 8080).
     host : str
-        Bind address (default "0.0.0.0").
+        Bind address (default "127.0.0.1" — localhost only for security).
     encrypt_key : str | None
         Encryption key; if *None* the key is read from ENVAULT_ENCRYPT_KEY or
         prompted interactively.
     store_name : str | None
         Named store from config to use; if *None* the default store is used.
+    api_key : str | None
+        Bearer token for API authentication. If provided, all /secrets
+        endpoints require an Authorization: Bearer <api-key> header.
+        If *None*, the ENVAULT_API_KEY env var is checked; if that is also
+        unset, auth is disabled (with a warning).
     """
 
     # Resolve encryption key (same auth model as decrypt command)
@@ -176,6 +235,9 @@ def run_server(
         encrypt_key = _get_encrypt_key()
     if not encrypt_key:
         raise SystemExit("Error: encryption key required (set ENVAULT_ENCRYPT_KEY or provide --password)")
+
+    # Resolve API key
+    resolved_api_key = _get_api_key(api_key)
 
     # Build the store instance
     if store_name and store_name in config.stores:
@@ -187,16 +249,22 @@ def run_server(
     else:
         store_instance = get_store("")
 
-    handler_class = create_handler(store_instance, config, encrypt_key)
+    handler_class = create_handler(store_instance, config, encrypt_key, resolved_api_key)
     server = HTTPServer((host, port), handler_class)
 
     from rich.console import Console
     console = Console()
     console.print(f"[green]✓[/green] envault serve listening on http://{host}:{port}")
-    console.print("  GET /secrets           — list all secret keys")
-    console.print("  GET /secrets?prefix=X  — filter keys by prefix")
-    console.print("  GET /secrets/{key}     — get decrypted value")
-    console.print("  GET /health            — store connectivity check")
+    console.print(" GET /secrets — list all secret keys")
+    console.print(" GET /secrets?prefix=X — filter keys by prefix")
+    console.print(" GET /secrets/{key} — get decrypted value")
+    console.print(" GET /health — store connectivity check")
+    if resolved_api_key:
+        console.print("[green]🔒[/green] API authentication enabled (Bearer token required)")
+    else:
+        console.print("[yellow]⚠[/yellow] No API key set — secrets endpoints are unauthenticated!")
+        console.print("[dim]   Set --api-key flag or ENVAULT_API_KEY env var to enable auth[/dim]")
+
     console.print("[dim]Press Ctrl+C to stop[/dim]")
 
     try:

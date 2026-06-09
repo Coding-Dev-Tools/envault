@@ -6,7 +6,7 @@ import typer
 from envault import __version__
 from envault.audit import AuditLogger
 from envault.config import EnvaultConfig, init_config
-from envault.diff import diff_env_files, format_diff
+from envault.diff import diff_env_files, format_diff, EnvDiffResult
 from envault.encrypt import decrypt_env, encrypt_env
 from envault.rotate import rotate_env_var
 from envault.serve import run_server
@@ -56,6 +56,7 @@ def diff(
     target_file: str | None = typer.Option(None, "--target", "-t", help="Target .env file path (overrides env name)"),
     config_path: str = typer.Option("", "--config", "-c", help="Config file path"),
     fail_on_missing: bool = typer.Option(False, "--fail-on-missing", help="Exit with code 1 if source has keys not in target"),
+    json_output: bool = typer.Option(False, "--json", help="Output result as JSON for programmatic use"),
 ):
     """Diff environment variables between two environments or .env files."""
     config = load_config(config_path)
@@ -69,10 +70,13 @@ def diff(
         result = diff_env_files(src_path, tgt_path)
         label_s, label_t = source_env, target_env
 
-    console.print(format_diff(result, label_s, label_t))
+    if json_output:
+        console.print(result.to_json(source_label=label_s, target_label=label_t))
+    else:
+        console.print(format_diff(result, label_s, label_t))
 
-    if result.has_differences:
-        console.print(f"\nTotal: {result.total_differences} difference(s)")
+        if result.has_differences:
+            console.print(f"\nTotal: {result.total_differences} difference(s)")
 
     if fail_on_missing and result.only_in_source:
         raise typer.Exit(1)
@@ -85,12 +89,16 @@ def diff_files(
     file1: str = typer.Argument(..., help="First .env file"),
     file2: str = typer.Argument(..., help="Second .env file"),
     fail_on_missing: bool = typer.Option(False, "--fail-on-missing", help="Exit with code 1 if source has keys not in target"),
+    json_output: bool = typer.Option(False, "--json", help="Output result as JSON for programmatic use"),
 ):
     """Diff two .env files directly (no config needed)."""
     result = diff_env_files(file1, file2)
-    console.print(format_diff(result, Path(file1).name, Path(file2).name))
-    if result.has_differences:
-        console.print(f"\nTotal: {result.total_differences} difference(s)")
+    if json_output:
+        console.print(result.to_json(source_label=Path(file1).name, target_label=Path(file2).name))
+    else:
+        console.print(format_diff(result, Path(file1).name, Path(file2).name))
+        if result.has_differences:
+            console.print(f"\nTotal: {result.total_differences} difference(s)")
 
     if fail_on_missing and result.only_in_source:
         raise typer.Exit(1)
@@ -430,8 +438,9 @@ def audit(
 @app.command()
 def serve(
     port: int = typer.Option(8080, "--port", "-p", help="Port to listen on"),
-    host: str = typer.Option("0.0.0.0", "--host", "-H", help="Bind address"),
+    host: str = typer.Option("127.0.0.1", "--host", "-H", help="Bind address (default: localhost only)"),
     password: str | None = typer.Option(None, "--password", "-k", help="Encryption password (prompted if omitted, or use ENVAULT_ENCRYPT_KEY)"),
+    api_key: str | None = typer.Option(None, "--api-key", help="Bearer token for API auth (or set ENVAULT_API_KEY)"),
     store: str | None = typer.Option(None, "--store", "-s", help="Named store from config to use"),
     config_path: str = typer.Option("", "--config", "-c", help="Config file path"),
 ):
@@ -439,16 +448,20 @@ def serve(
 
     Endpoints:
 
-    GET /secrets — list all secret keys
+ GET /secrets — list all secret keys
 
-    GET /secrets?prefix=X — filter keys by prefix
+ GET /secrets?prefix=X — filter keys by prefix
 
-    GET /secrets/{key} — get decrypted value for a key
+ GET /secrets/{key} — get decrypted value for a key
 
-    GET /health — store connectivity check
+ GET /health — store connectivity check
+
+    Security:
+ - Default bind is 127.0.0.1 (localhost only); use --host 0.0.0.0 to expose.
+ - Set --api-key or ENVAULT_API_KEY to require Bearer token auth on /secrets.
     """
     config = load_config(config_path)
-    run_server(config, port=port, host=host, encrypt_key=password, store_name=store)
+    run_server(config, port=port, host=host, encrypt_key=password, store_name=store, api_key=api_key)
 
 
 # ── Version ─────────────────────────────────────────────────────────────────

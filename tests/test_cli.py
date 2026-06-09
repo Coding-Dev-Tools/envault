@@ -160,6 +160,61 @@ def test_diff_files_not_found(runner: CliRunner, tmp_path):
     assert "identical" in result.stdout.lower()
 
 
+def test_diff_files_json_output(runner: CliRunner, tmp_path):
+    """diff-files --json should produce valid JSON with diff categories."""
+    import json as _json
+    file1 = tmp_path / "a.env"
+    file2 = tmp_path / "b.env"
+    file1.write_text("KEY=value\nFOO=bar\nONLY_SRC=yes\n")
+    file2.write_text("KEY=other\nFOO=bar\nEXTRA=x\n")
+
+    result = runner.invoke(app, ["diff-files", str(file1), str(file2), "--json"])
+    assert result.exit_code == 0
+    parsed = _json.loads(result.stdout)
+    assert parsed["has_differences"] is True
+    assert "KEY" in parsed["different"]
+    assert "ONLY_SRC" in parsed["only_in_source"]
+    assert "EXTRA" in parsed["only_in_target"]
+    assert "FOO" in parsed["common_keys"]
+
+
+def test_diff_files_json_identical(runner: CliRunner, tmp_path):
+    """diff-files --json with identical files should show no differences."""
+    import json as _json
+    file1 = tmp_path / "a.env"
+    file2 = tmp_path / "b.env"
+    file1.write_text("KEY=value\n")
+    file2.write_text("KEY=value\n")
+
+    result = runner.invoke(app, ["diff-files", str(file1), str(file2), "--json"])
+    assert result.exit_code == 0
+    parsed = _json.loads(result.stdout)
+    assert parsed["has_differences"] is False
+    assert parsed["total_differences"] == 0
+
+
+def test_diff_with_config_json(runner: CliRunner, tmp_path):
+    """diff --json with config and explicit file overrides should output JSON."""
+    import json as _json
+    config_path = _make_config(tmp_path)
+    src = tmp_path / "src.env"
+    tgt = tmp_path / "tgt.env"
+    src.write_text("KEY=source_value\nSHARED=yes\n")
+    tgt.write_text("KEY=target_value\nSHARED=yes\n")
+
+    result = runner.invoke(app, [
+        "diff", "dev", "prod",
+        "--source", str(src),
+        "--target", str(tgt),
+        "--config", config_path,
+        "--json",
+    ])
+    assert result.exit_code == 0
+    parsed = _json.loads(result.stdout)
+    assert parsed["has_differences"] is True
+    assert "KEY" in parsed["different"]
+
+
 # ── Encrypt / Decrypt ───────────────────────────────────────────────────────
 
 

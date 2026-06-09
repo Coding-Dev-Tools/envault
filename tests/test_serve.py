@@ -41,14 +41,14 @@ class _FakeStore:
         return keys
 
 
-def _make_handler(store, config: EnvaultConfig | None = None):
+def _make_handler(store, config: EnvaultConfig | None = None, api_key: str | None = None):
     """Create a handler class bound to the given store and return a mock instance.
 
     We create a mock request handler that has the routing logic from
     SecretHandler but uses pre-set wfile/rfile so we can inspect output.
     """
     config = config or EnvaultConfig()
-    handler_class = create_handler(store, config, encrypt_key="test-key")
+    handler_class = create_handler(store, config, encrypt_key="test-key", api_key=api_key)
 
     # Build a minimal instance that has enough of BaseHTTPRequestHandler
     # wired up to test do_GET routing and response writing.
@@ -182,7 +182,7 @@ class TestSecretsGet:
         store = _FakeStore({"KEY": "val"})
         handler = _make_handler(store)
         # Path with explicitly empty key after /secrets/
-        # Note: /secrets/ gets rstrip("/") → /secrets → list endpoint
+        # Note: /secrets/ gets rstrip("/") -> /secrets -> list endpoint
         # To test the 400, we need a key that resolves to empty after routing
         # The handler checks startswith("/secrets/") then extracts key
         # A URL-decoded empty key won't happen in practice, but we test
@@ -278,10 +278,120 @@ class TestRouting:
         handler.path = "/secrets/"
         handler.do_GET()
 
-        # /secrets/ with trailing slash → after rstrip("/") becomes "/secrets"
+        # /secrets/ with trailing slash -> after rstrip("/") becomes "/secrets"
         # which routes to the list endpoint
         assert handler._sent_status == 200
         assert "keys" in handler._sent_json
+
+
+# ── Tests: API Authentication ──────────────────────────────────────────────────
+
+
+class TestApiAuth:
+    """Tests for Bearer token authentication on /secrets endpoints."""
+
+    def test_no_auth_configured_allows_secrets(self):
+        """Without api_key set, /secrets should be accessible."""
+        store = _FakeStore({"DB_URL": "postgres://localhost"})
+        handler = _make_handler(store, api_key=None)
+        handler.path = "/secrets"
+        handler.do_GET()
+
+        assert handler._sent_status == 200
+        assert "DB_URL" in handler._sent_json["keys"]
+
+    def test_no_auth_configured_allows_secrets_get(self):
+        """Without api_key set, /secrets/{key} should be accessible."""
+        store = _FakeStore({"DB_URL": "postgres://localhost"})
+        handler = _make_handler(store, api_key=None)
+        handler.path = "/secrets/DB_URL"
+        handler.do_GET()
+
+        assert handler._sent_status == 200
+        assert handler._sent_json["value"] == "postgres://localhost"
+
+    def test_auth_valid_bearer_allows_secrets(self):
+        """With correct Bearer token, /secrets should be accessible."""
+        store = _FakeStore({"DB_URL": "postgres://localhost"})
+        handler = _make_handler(store, api_key="my-secret-key")
+        handler.headers = {"Authorization": "Bearer my-secret-key"}
+        handler.path = "/secrets"
+        handler.do_GET()
+
+        assert handler._sent_status == 200
+
+    def test_auth_valid_bearer_allows_secrets_get(self):
+        """With correct Bearer token, /secrets/{key} should be accessible."""
+        store = _FakeStore({"DB_URL": "postgres://localhost"})
+        handler = _make_handler(store, api_key="my-secret-key")
+        handler.headers = {"Authorization": "Bearer my-secret-key"}
+        handler.path = "/secrets/DB_URL"
+        handler.do_GET()
+
+        assert handler._sent_status == 200
+        assert handler._sent_json["value"] == "postgres://localhost"
+
+    def test_auth_missing_header_returns_401(self):
+        """Without Authorization header when auth is enabled, should return 401."""
+        store = _FakeStore({"DB_URL": "postgres://localhost"})
+        handler = _make_handler(store, api_key="my-secret-key")
+        handler.headers = {}
+        handler.path = "/secrets"
+        handler.do_GET()
+
+        assert handler._sent_status == 401
+        assert "unauthorized" in handler._sent_json["error"].lower()
+
+    def test_auth_wrong_token_returns_401(self):
+        """With incorrect Bearer token, should return 401."""
+        store = _FakeStore({"DB_URL": "postgres://localhost"})
+        handler = _make_handler(store, api_key="my-secret-key")
+        handler.headers = {"Authorization": "Bearer wrong-token"}
+        handler.path = "/secrets"
+        handler.do_GET()
+
+        assert handler._sent_status == 401
+
+    def test_auth_wrong_token_returns_401_on_get_key(self):
+        """With incorrect Bearer token on /secrets/{key}, should return 401."""
+        store = _FakeStore({"DB_URL": "postgres://localhost"})
+        handler = _make_handler(store, api_key="my-secret-key")
+        handler.headers = {"Authorization": "Bearer wrong-token"}
+        handler.path = "/secrets/DB_URL"
+        handler.do_GET()
+
+        assert handler._sent_status == 401
+
+    def test_auth_malformed_header_returns_401(self):
+        """With malformed Authorization header, should return 401."""
+        store = _FakeStore({"DB_URL": "postgres://localhost"})
+        handler = _make_handler(store, api_key="my-secret-key")
+        handler.headers = {"Authorization": "Basic dXNlcjpwYXNz"}
+        handler.path = "/secrets"
+        handler.do_GET()
+
+        assert handler._sent_status == 401
+
+    def test_health_always_accessible_with_auth(self):
+        """GET /health should be accessible even without auth when api_key is set."""
+        store = _FakeStore({"K": "v"})
+        handler = _make_handler(store, api_key="my-secret-key")
+        handler.headers = {}  # No auth header
+        handler.path = "/health"
+        handler.do_GET()
+
+        assert handler._sent_status == 200
+        assert handler._sent_json["status"] == "ok"
+
+    def test_auth_empty_bearer_returns_401(self):
+        """Bearer with empty token should return 401."""
+        store = _FakeStore({"DB_URL": "postgres://localhost"})
+        handler = _make_handler(store, api_key="my-secret-key")
+        handler.headers = {"Authorization": "Bearer "}
+        handler.path = "/secrets"
+        handler.do_GET()
+
+        assert handler._sent_status == 401
 
 
 # ── Tests: create_handler ──────────────────────────────────────────────────────
@@ -313,6 +423,20 @@ class TestCreateHandler:
         assert handler_a.encrypt_key == "key-a"
         assert handler_b.encrypt_key == "key-b"
 
+    def test_handler_class_with_api_key(self):
+        """create_handler should bind api_key to the handler class."""
+        store = _FakeStore({"X": "y"})
+        handler_class = create_handler(store, EnvaultConfig(), encrypt_key="enc", api_key="api-token")
+
+        assert handler_class.api_key == "api-token"
+
+    def test_handler_class_without_api_key(self):
+        """create_handler with no api_key should set it to None."""
+        store = _FakeStore({"X": "y"})
+        handler_class = create_handler(store, EnvaultConfig(), encrypt_key="enc")
+
+        assert handler_class.api_key is None
+
 
 # ── Tests: CLI serve command ───────────────────────────────────────────────────
 
@@ -330,6 +454,26 @@ class TestServeCLI:
         assert result.exit_code == 0
         assert "port" in result.stdout.lower()
         assert "health" in result.stdout.lower() or "secrets" in result.stdout.lower()
+
+    def test_serve_help_shows_api_key_option(self):
+        """serve --help should show the --api-key option."""
+        from typer.testing import CliRunner
+        from envault.cli import app
+
+        runner = CliRunner()
+        result = runner.invoke(app, ["serve", "--help"])
+        assert result.exit_code == 0
+        assert "api-key" in result.stdout.lower()
+
+    def test_serve_help_shows_default_host_localhost(self):
+        """serve --help should show default host as 127.0.0.1."""
+        from typer.testing import CliRunner
+        from envault.cli import app
+
+        runner = CliRunner()
+        result = runner.invoke(app, ["serve", "--help"])
+        assert result.exit_code == 0
+        assert "127.0.0.1" in result.stdout
 
     def test_serve_no_encrypt_key_exits(self, tmp_path):
         """serve without any encryption key should exit with error."""
