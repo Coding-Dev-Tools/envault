@@ -1,6 +1,6 @@
 """QA verification script for COM-367."""
-import tempfile
 import os
+import tempfile
 from envault.cli import app
 from typer.testing import CliRunner
 
@@ -33,6 +33,7 @@ with tempfile.TemporaryDirectory() as td:
 # Test 3: JSON output with Rich control chars
 print("=== Root Cause 3: JSON output control chars ===")
 import json as _json
+
 with tempfile.TemporaryDirectory() as td:
     env_file = os.path.join(td, ".env")
     with open(env_file, "w") as f:
@@ -46,7 +47,7 @@ with tempfile.TemporaryDirectory() as td:
         # Try with strict=False
         try:
             parsed = _json.loads(result.output, strict=False)
-            print(f"  JSON parse (strict=False): OK")
+            print("  JSON parse (strict=False): OK")
         except _json.JSONDecodeError as e2:
             print(f"  JSON parse (strict=False): FAILED - {e2}")
             print(f"  Raw output repr: {result.output[:200]!r}")
@@ -64,7 +65,7 @@ with tempfile.TemporaryDirectory() as td:
     print(f"  OUTPUT: {result.output.strip()}")
     print()
 
-# Test 5: The original defect test value AKIAIO5VESWPEXAMPLE 
+# Test 5: The original defect test value AKIAIO5VESWPEXAMPLE
 print("=== Root Cause 2b: AKIAIO5VESWPEXAMPLE (15 chars after AKIA) ===")
 with tempfile.TemporaryDirectory() as td:
     env_file = os.path.join(td, ".env")

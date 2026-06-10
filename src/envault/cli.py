@@ -545,10 +545,7 @@ def history(
     """
     config = load_config(config_path)
 
-    if file:
-        env_file = Path(file)
-    else:
-        env_file = config.get_env_path(env)
+    env_file = Path(file) if file else config.get_env_path(env)
 
     if not env_file.exists():
         err_console.print(f"[red]Error:[/red] Environment file '{env_file}' not found")
@@ -665,10 +662,10 @@ def backup_restore(
             console.print(f"[green]✓[/green] Restored → {restored_path}")
     except ValueError as e:
         err_console.print(f"[red]Error:[/red] {e}")
-        raise typer.Exit(1)
+        raise typer.Exit(1) from e
     except FileNotFoundError as e:
         err_console.print(f"[red]Error:[/red] {e}")
-        raise typer.Exit(1)
+        raise typer.Exit(1) from e
 
 
 # ── Serve (HTTP API) ──────────────────────────────────────────────────────────

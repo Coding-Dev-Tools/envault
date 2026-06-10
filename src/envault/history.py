@@ -209,9 +209,6 @@ def _diff_at_commit(
     if meta is None:
         return []
 
-    # Get the diff content for this file at this commit
-    diff_text = _get_file_diff(file_path, commit, parent_ref)
-
     # Parse the unified diff to extract key-level changes
     old_content = _get_file_at_ref(file_path, parent_ref)
     new_content = _get_file_at_ref(file_path, commit)

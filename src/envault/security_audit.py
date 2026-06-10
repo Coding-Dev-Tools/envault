@@ -366,7 +366,7 @@ def audit_env_file(file_path: str | Path, *, check_permissions: bool = True, che
 
     # ── Per-key checks ────────────────────────────────────────────────────
 
-    for line_num, line in enumerate(lines, 1):
+    for _line_num, line in enumerate(lines, 1):
         line_stripped = line.strip()
         if not line_stripped or line_stripped.startswith("#"):
             continue

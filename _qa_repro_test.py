@@ -1,7 +1,7 @@
 """Standalone test to reproduce COM-367 behavior."""
-from pathlib import Path
 import tempfile
 from envault.cli import app
+from pathlib import Path
 from typer.testing import CliRunner
 
 
@@ -16,7 +16,7 @@ def test_scan_hardcoded_credential_repro():
     print(f"output: {result.output}")
     print(f"hardcoded_credential in output: {'hardcoded_credential' in result.output}")
     assert result.exit_code == 1, f"Expected exit_code 1, got {result.exit_code}"
-    assert "hardcoded_credential" in result.output, f"'hardcoded_credential' not in output"
+    assert "hardcoded_credential" in result.output, "'hardcoded_credential' not in output"
 
 
 def test_scan_weak_password_repro():
@@ -28,7 +28,7 @@ def test_scan_weak_password_repro():
     result = runner.invoke(app, ["scan", str(env_file), "--no-permissions", "--no-gitignore"])
     print(f"exit_code: {result.exit_code}")
     print(f"output: {result.output}")
-    assert "weak_secret" in result.output, f"'weak_secret' not in output"
+    assert "weak_secret" in result.output, "'weak_secret' not in output"
 
 
 def test_scan_json_output_repro():
