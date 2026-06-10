@@ -15,16 +15,19 @@ class TestAwsSsmStore:
 
     def _make_store(self):
         from envault.stores import AwsSsmStore
+
         return AwsSsmStore(path_prefix="/myapp", region="us-east-1")
 
     def test_init_defaults(self):
         from envault.stores import AwsSsmStore
+
         store = AwsSsmStore()
         assert store.path_prefix == ""
         assert store.region == "us-east-1"
 
     def test_init_with_prefix(self):
         from envault.stores import AwsSsmStore
+
         store = AwsSsmStore(path_prefix="/myapp/", region="eu-west-1")
         assert store.path_prefix == "/myapp"
         assert store.region == "eu-west-1"
@@ -38,9 +41,7 @@ class TestAwsSsmStore:
         with patch.object(store, "_get_client", return_value=mock_client):
             result = store.get("DB_PASSWORD")
             assert result == "secret123"
-            mock_client.get_parameter.assert_called_once_with(
-                Name="/myapp/DB_PASSWORD", WithDecryption=True
-            )
+            mock_client.get_parameter.assert_called_once_with(Name="/myapp/DB_PASSWORD", WithDecryption=True)
 
     def test_get_not_found(self):
         store = self._make_store()
@@ -119,9 +120,9 @@ class TestAwsSsmStore:
 
     def test_boto3_not_installed(self):
         from envault.stores import AwsSsmStore, SecretStoreError
+
         store = AwsSsmStore()
-        with patch.dict("sys.modules", {"boto3": None}), \
-             pytest.raises(SecretStoreError, match="boto3 not installed"):
+        with patch.dict("sys.modules", {"boto3": None}), pytest.raises(SecretStoreError, match="boto3 not installed"):
             store._get_client()
 
 
@@ -133,6 +134,7 @@ class TestVaultStore:
 
     def test_init_defaults(self):
         from envault.stores import VaultStore
+
         store = VaultStore()
         assert store.url == "http://127.0.0.1:8200"
         assert store.mount_point == "secret"
@@ -140,8 +142,8 @@ class TestVaultStore:
 
     def test_init_with_params(self):
         from envault.stores import VaultStore
-        store = VaultStore(url="https://vault.example.com", token="s.abc",
-                           mount_point="kv", path_prefix="myapp")
+
+        store = VaultStore(url="https://vault.example.com", token="s.abc", mount_point="kv", path_prefix="myapp")
         assert store.url == "https://vault.example.com"
         assert store.token == "s.abc"
         assert store.mount_point == "kv"
@@ -149,21 +151,22 @@ class TestVaultStore:
 
     def test_full_path_no_prefix(self):
         from envault.stores import VaultStore
+
         store = VaultStore()
         assert store._full_path("DB_PASSWORD") == "DB_PASSWORD"
 
     def test_full_path_with_prefix(self):
         from envault.stores import VaultStore
+
         store = VaultStore(path_prefix="myapp")
         assert store._full_path("DB_PASSWORD") == "myapp/DB_PASSWORD"
 
     def test_get_found(self):
         from envault.stores import VaultStore
+
         store = VaultStore(token="s.test")
         mock_client = MagicMock()
-        mock_client.secrets.kv.v2.read_secret.return_value = {
-            "data": {"data": {"value": "secret_val"}}
-        }
+        mock_client.secrets.kv.v2.read_secret.return_value = {"data": {"data": {"value": "secret_val"}}}
 
         with patch.object(store, "_get_client", return_value=mock_client):
             result = store.get("MY_KEY")
@@ -171,6 +174,7 @@ class TestVaultStore:
 
     def test_get_not_found(self):
         from envault.stores import VaultStore
+
         store = VaultStore(token="s.test")
         mock_client = MagicMock()
         mock_client.secrets.kv.v2.read_secret.side_effect = Exception("not found")
@@ -181,6 +185,7 @@ class TestVaultStore:
 
     def test_set(self):
         from envault.stores import VaultStore
+
         store = VaultStore(token="s.test")
         mock_client = MagicMock()
 
@@ -191,6 +196,7 @@ class TestVaultStore:
 
     def test_delete_found(self):
         from envault.stores import VaultStore
+
         store = VaultStore(token="s.test")
         mock_client = MagicMock()
 
@@ -200,6 +206,7 @@ class TestVaultStore:
 
     def test_delete_not_found(self):
         from envault.stores import VaultStore
+
         store = VaultStore(token="s.test")
         mock_client = MagicMock()
         mock_client.secrets.kv.v2.delete_metadata_and_all_versions.side_effect = Exception("404")
@@ -210,11 +217,10 @@ class TestVaultStore:
 
     def test_list_keys(self):
         from envault.stores import VaultStore
+
         store = VaultStore(token="s.test")
         mock_client = MagicMock()
-        mock_client.secrets.kv.v2.list_secrets.return_value = {
-            "data": {"keys": ["DB_HOST", "DB_PORT", "API_KEY/"]}
-        }
+        mock_client.secrets.kv.v2.list_secrets.return_value = {"data": {"keys": ["DB_HOST", "DB_PORT", "API_KEY/"]}}
 
         with patch.object(store, "_get_client", return_value=mock_client):
             keys = store.list_keys()
@@ -223,6 +229,7 @@ class TestVaultStore:
 
     def test_list_keys_empty(self):
         from envault.stores import VaultStore
+
         store = VaultStore(token="s.test")
         mock_client = MagicMock()
         mock_client.secrets.kv.v2.list_secrets.side_effect = Exception("no keys")
@@ -233,20 +240,23 @@ class TestVaultStore:
 
     def test_vault_auth_fails(self):
         from envault.stores import SecretStoreError, VaultStore
+
         store = VaultStore(token="bad-token")
         mock_hvac = MagicMock()
         mock_client = MagicMock()
         mock_client.is_authenticated.return_value = False
         mock_hvac.Client.return_value = mock_client
-        with patch.dict("sys.modules", {"hvac": mock_hvac}), \
-             pytest.raises(SecretStoreError, match="authentication failed"):
+        with (
+            patch.dict("sys.modules", {"hvac": mock_hvac}),
+            pytest.raises(SecretStoreError, match="authentication failed"),
+        ):
             store._get_client()
 
     def test_hvac_not_installed(self):
         from envault.stores import SecretStoreError, VaultStore
+
         store = VaultStore()
-        with patch.dict("sys.modules", {"hvac": None}), \
-             pytest.raises(SecretStoreError, match="hvac not installed"):
+        with patch.dict("sys.modules", {"hvac": None}), pytest.raises(SecretStoreError, match="hvac not installed"):
             store._get_client()
 
 
@@ -259,6 +269,7 @@ class TestDopplerStoreDeep:
     def test_get_found(self):
         import responses
         from envault.stores import DopplerStore
+
         store = DopplerStore(project="myapp", config="prd", token="dp-test")
         url = "https://api.doppler.com/v3/configs/config/secrets"
 
@@ -270,6 +281,7 @@ class TestDopplerStoreDeep:
     def test_get_falls_back_to_computed(self):
         import responses
         from envault.stores import DopplerStore
+
         store = DopplerStore(project="myapp", config="prd", token="dp-test")
         url = "https://api.doppler.com/v3/configs/config/secrets"
 
@@ -281,6 +293,7 @@ class TestDopplerStoreDeep:
     def test_list_keys_with_prefix(self):
         import responses
         from envault.stores import DopplerStore
+
         store = DopplerStore(project="myapp", config="prd", token="dp-test")
         url = "https://api.doppler.com/v3/configs/config/secrets"
 
@@ -294,6 +307,7 @@ class TestDopplerStoreDeep:
     def test_delete_returns_false_on_non_204(self):
         import responses
         from envault.stores import DopplerStore
+
         store = DopplerStore(project="myapp", config="prd", token="dp-test")
         url = "https://api.doppler.com/v3/configs/config/secrets"
 
@@ -304,6 +318,7 @@ class TestDopplerStoreDeep:
     def test_set_returns_false_on_non_200(self):
         import responses
         from envault.stores import DopplerStore
+
         store = DopplerStore(project="myapp", config="prd", token="dp-test")
         url = "https://api.doppler.com/v3/configs/config/secrets"
 
@@ -321,6 +336,7 @@ class TestOnePasswordStoreDeep:
     def test_get_found(self):
         import responses
         from envault.stores import OnePasswordStore
+
         store = OnePasswordStore(token="fake", vault_id="v1")
         base_url = "http://localhost:8080/v1/vaults/v1/items"
         filter_url = base_url + "?filter=title%20eq%20%22MY_SECRET%22"
@@ -342,6 +358,7 @@ class TestOnePasswordStoreDeep:
     def test_get_no_password_field(self):
         import responses
         from envault.stores import OnePasswordStore
+
         store = OnePasswordStore(token="fake", vault_id="v1")
         url = "http://localhost:8080/v1/vaults/v1/items"
 
@@ -361,6 +378,7 @@ class TestOnePasswordStoreDeep:
     def test_set_success(self):
         import responses
         from envault.stores import OnePasswordStore
+
         store = OnePasswordStore(token="fake", vault_id="v1")
         url = "http://localhost:8080/v1/vaults/v1/items"
 
@@ -372,6 +390,7 @@ class TestOnePasswordStoreDeep:
     def test_delete_found(self):
         import responses
         from envault.stores import OnePasswordStore
+
         store = OnePasswordStore(token="fake", vault_id="v1")
         base_url = "http://localhost:8080/v1/vaults/v1/items"
         item_id = "item-abc-123"
@@ -386,6 +405,7 @@ class TestOnePasswordStoreDeep:
     def test_delete_not_found(self):
         import responses
         from envault.stores import OnePasswordStore
+
         store = OnePasswordStore(token="fake", vault_id="v1")
         base_url = "http://localhost:8080/v1/vaults/v1/items"
 
@@ -398,13 +418,12 @@ class TestOnePasswordStoreDeep:
     def test_list_keys_with_prefix(self):
         import responses
         from envault.stores import OnePasswordStore
+
         store = OnePasswordStore(token="fake", vault_id="v1")
         url = "http://localhost:8080/v1/vaults/v1/items"
 
         with responses.RequestsMock() as rsps:
-            rsps.get(url, json={"items": [
-                {"title": "DB_HOST"}, {"title": "DB_PORT"}, {"title": "API_KEY"}
-            ]})
+            rsps.get(url, json={"items": [{"title": "DB_HOST"}, {"title": "DB_PORT"}, {"title": "API_KEY"}]})
             keys = store.list_keys(prefix="DB_")
             assert keys == ["DB_HOST", "DB_PORT"]
 
@@ -418,6 +437,7 @@ class TestStoreFactoryDeep:
     def test_aws_ssm_config(self):
         from envault.config import SecretStoreConfig
         from envault.stores import AwsSsmStore, get_store
+
         config = SecretStoreConfig(type="aws-ssm", path_prefix="/myapp")
         store = get_store(config)
         assert isinstance(store, AwsSsmStore)
@@ -426,8 +446,8 @@ class TestStoreFactoryDeep:
     def test_vault_config(self):
         from envault.config import SecretStoreConfig
         from envault.stores import VaultStore, get_store
-        config = SecretStoreConfig(type="vault", path_prefix="myapp",
-                                    token_env_var="VAULT_TOKEN")
+
+        config = SecretStoreConfig(type="vault", path_prefix="myapp", token_env_var="VAULT_TOKEN")
         with patch.dict("os.environ", {"VAULT_TOKEN": "s.test"}):
             store = get_store(config)
             assert isinstance(store, VaultStore)
@@ -436,8 +456,8 @@ class TestStoreFactoryDeep:
     def test_doppler_config(self):
         from envault.config import SecretStoreConfig
         from envault.stores import DopplerStore, get_store
-        config = SecretStoreConfig(type="doppler", path_prefix="myproj",
-                                    token_env_var="DOPPLER_TOKEN")
+
+        config = SecretStoreConfig(type="doppler", path_prefix="myproj", token_env_var="DOPPLER_TOKEN")
         with patch.dict("os.environ", {"DOPPLER_TOKEN": "dp.test"}):
             store = get_store(config)
             assert isinstance(store, DopplerStore)
@@ -446,8 +466,8 @@ class TestStoreFactoryDeep:
     def test_onepassword_config(self):
         from envault.config import SecretStoreConfig
         from envault.stores import OnePasswordStore, get_store
-        config = SecretStoreConfig(type="onepassword", path_prefix="vault1",
-                                    token_env_var="OP_TOKEN")
+
+        config = SecretStoreConfig(type="onepassword", path_prefix="vault1", token_env_var="OP_TOKEN")
         with patch.dict("os.environ", {"OP_TOKEN": "op.test", "OP_CONNECT_URL": "https://op.example.com"}):
             store = get_store(config)
             assert isinstance(store, OnePasswordStore)
@@ -461,5 +481,6 @@ class TestStoreFactoryDeep:
 def test_main_module_invocation():
     """__main__.py should invoke the CLI app."""
     from envault.__main__ import __name__ as module_name
+
     # Just verify the module imports cleanly
     assert module_name == "envault.__main__"

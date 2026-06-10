@@ -165,7 +165,7 @@ def test_write_env_file_backslash_in_value(tmp_path):
     write_env_file(str(path), env_vars)
     content = path.read_text()
     # The value contains backslashes which trigger quoting; backslashes are doubled
-    assert 'path\\to\\file' in content or 'path\\\\to\\\\file' in content
+    assert "path\\to\\file" in content or "path\\\\to\\\\file" in content
 
 
 def test_write_env_file_space_in_value(tmp_path):
