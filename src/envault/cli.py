@@ -6,7 +6,7 @@ import typer
 from envault import __version__
 from envault.audit import AuditLogger
 from envault.config import EnvaultConfig, init_config
-from envault.diff import diff_env_files, format_diff, EnvDiffResult
+from envault.diff import diff_env_files, format_diff
 from envault.encrypt import decrypt_env, encrypt_env
 from envault.rotate import rotate_env_var
 from envault.serve import run_server
