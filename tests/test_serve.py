@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-import pytest
-from envault.serve import *
+import io
+import json
+from unittest.mock import MagicMock
 
 # ── Fixtures ────────────────────────────────────────────────────────────────
 
@@ -49,11 +50,48 @@ def test_create_handler_api_token_edge_cases(api_token, store=..., config=..., e
     pass
 
 
-@pytest.mark.parametrize("api_key", [pytest.param("", id="empty_string"), pytest.param("   ", id="whitespace"), pytest.param('xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx', id="long_string"), pytest.param('héllo wörld', id="unicode"), pytest.param('line1\nline2', id="with_newline")])
-def test_create_handler_api_key_edge_cases(api_key, store=..., config=..., encrypt_key=..., api_token=..., auth_mode=..., oauth_introspect_url=..., oauth_userinfo_url=..., oauth_client_id=..., oauth_client_secret=...):
-    """Edge cases for create_handler param api_key."""
-    # TODO: call serve.create_handler with edge-case api_key
-    pass
+def _build_handler_instance(handler_class):
+    """Construct a handler instance with mocked I/O for testing."""
+
+    # BaseHTTPRequestHandler.__init__ reads from rfile and writes to wfile.
+    # We mock the socket-level details and call the init ourselves.
+    rfile = io.BytesIO(b"")
+    wfile = io.BytesIO()
+
+    # We avoid calling BaseHTTPRequestHandler.__init__ (which tries to parse
+    # a request). Instead we manually set the attributes we need.
+    instance = object.__new__(handler_class)
+    instance.rfile = rfile
+    instance.wfile = wfile
+    instance.send_response = MagicMock()
+    instance.send_header = MagicMock()
+    instance.end_headers = MagicMock()
+    instance.client_address = ("127.0.0.1", 9999)
+    instance.server = MagicMock()
+    instance.command = "GET"
+    instance.request_version = "HTTP/1.1"
+
+    # Track what _send_json writes so we can assert on it
+    instance._sent_json = None
+    instance._sent_status = None
+    instance._sent_body = None
+
+    # Override _send_json to capture output instead of writing raw bytes
+
+    def _capturing_send_json(self_inner, data, status=200):
+        self_inner._sent_json = data
+        self_inner._sent_status = status
+        body = json.dumps(data, indent=2, ensure_ascii=False).encode("utf-8")
+        self_inner._sent_body = body
+        self_inner.send_response(status)
+        self_inner.send_header("Content-Type", "application/json; charset=utf-8")
+        self_inner.send_header("Content-Length", str(len(body)))
+        self_inner.end_headers()
+        self_inner.wfile.write(body)
+
+    instance._send_json = lambda data, status=200: _capturing_send_json(instance, data, status)
+
+    return instance
 
 
 @pytest.mark.parametrize("auth_mode", [pytest.param("", id="empty_string"), pytest.param("   ", id="whitespace"), pytest.param('xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx', id="long_string"), pytest.param('héllo wörld', id="unicode"), pytest.param('line1\nline2', id="with_newline")])

@@ -13,7 +13,7 @@ from envault import __version__
 from envault.audit import AuditLogger
 from envault.backup import backup_env_file, format_backup_list, list_backups, restore_backup
 from envault.config import EnvaultConfig, init_config
-from envault.diff import diff_env_files, format_diff, EnvDiffResult
+from envault.diff import diff_env_files, format_diff
 from envault.encrypt import decrypt_env, encrypt_env
 from envault.history import format_history, get_env_history
 from envault.rotate import rotate_env_var

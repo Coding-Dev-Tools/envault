@@ -27,9 +27,9 @@ from urllib.error import URLError
 from urllib.parse import parse_qs, urlencode, urlparse
 from urllib.request import Request, urlopen
 
-# In-memory cache for OAuth2 token validation results
-_oauth2_cache: dict[str, tuple[bool, float]] = {}
-_OAUTH2_CACHE_TTL = 300  # seconds
+from envault.config import EnvaultConfig
+from envault.encrypt import KEY_ENV_VAR
+from envault.stores import SecretStore, LocalEnvStore, get_store
 
 # Environment variable for API authentication key
 API_KEY_ENV_VAR = "ENVAULT_API_KEY"
@@ -70,10 +70,17 @@ class SecretHandler(BaseHTTPRequestHandler):
             return True
 
         auth_header = self.headers.get("Authorization", "")
-        if auth_header.startswith("Bearer "):
-            token = auth_header[len("Bearer "):]
-            if _secrets.compare_digest(token, self.api_key):
-                return True
+        if not auth_header:
+            self._send_error(401, "Unauthorized: valid Bearer token required")
+            return False
+
+        token = auth_header[len("Bearer "):] if auth_header.startswith("Bearer ") else auth_header
+        if not token or not token.strip():
+            self._send_error(401, "Unauthorized: valid Bearer token required")
+            return False
+
+        if _secrets.compare_digest(token.strip(), self.api_key) if self.api_key else _secrets.compare_digest(token.strip(), ""):
+            return True
 
         self._send_error(401, "Unauthorized: valid Bearer token required")
         return False

@@ -148,9 +148,18 @@ def diff_env_files(
     source_path: str | Path,
     target_path: str | Path,
 ) -> EnvDiffResult:
-    """Compare two .env files and return the diff."""
-    source = load_env_file(source_path)
-    target = load_env_file(target_path)
+    """Compare two .env files and return the diff.
+
+    Non-existent files are treated as empty environments instead of raising.
+    """
+    try:
+        source = load_env_file(source_path)
+    except FileNotFoundError:
+        source = {}
+    try:
+        target = load_env_file(target_path)
+    except FileNotFoundError:
+        target = {}
     return diff_envs(source, target)
 
 
