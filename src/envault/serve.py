@@ -4,12 +4,14 @@ Endpoints:
  GET /secrets -> list all secret keys (or filter by ?prefix=FOO)
  GET /secrets/{key} -> get decrypted value for a specific key
  GET /health -> connectivity check for the backing store
- GET /auth/info -> show configured auth methods (no secrets exposed)
 
-Authentication:
- - Bearer token (Authorization: Bearer <token>) -- static or OAuth2 introspection
- - API key (X-API-Key: <key>) header
- - Configurable via --auth-mode: "bearer", "api-key", "oauth2", "any"
+Security:
+ - Default bind address is 127.0.0.1 (localhost only).
+ - If --api-key is provided, all endpoints (except /health) require
+   an Authorization: Bearer <api-key> header. Requests without a
+   valid token receive 401 Unauthorized.
+ - If --api-key is not provided, a warning is printed at startup
+   recommending authentication for production use.
 """
 
 from __future__ import annotations
@@ -17,20 +19,20 @@ from __future__ import annotations
 import base64
 import json
 import os
-import time
-from envault.config import EnvaultConfig
-from envault.encrypt import KEY_ENV_VAR
-from envault.stores import LocalEnvStore, SecretStore, get_store
-from http.server import BaseHTTPRequestHandler, HTTPServer
+import secrets as _secrets
+from http.server import HTTPServer, BaseHTTPRequestHandler
 from pathlib import Path
 from typing import Any
 from urllib.error import URLError
 from urllib.parse import parse_qs, urlencode, urlparse
 from urllib.request import Request, urlopen
 
-# In-memory cache for OAuth2 token validation results
-_oauth2_cache: dict[str, tuple[bool, float]] = {}
-_OAUTH2_CACHE_TTL = 300  # seconds
+from envault.config import EnvaultConfig
+from envault.encrypt import KEY_ENV_VAR
+from envault.stores import SecretStore, LocalEnvStore, get_store
+
+# Environment variable for API authentication key
+API_KEY_ENV_VAR = "ENVAULT_API_KEY"
 
 
 class SecretHandler(BaseHTTPRequestHandler):
@@ -40,13 +42,7 @@ class SecretHandler(BaseHTTPRequestHandler):
     store: SecretStore
     config: EnvaultConfig
     encrypt_key: str | None
-    api_token: str | None
-    api_key: str | None
-    auth_mode: str  # "bearer", "api-key", "oauth2", "any"
-    oauth_introspect_url: str | None
-    oauth_userinfo_url: str | None
-    oauth_client_id: str | None
-    oauth_client_secret: str | None
+    api_key: str | None  # Bearer token for API auth; None = auth disabled
 
     # -- Helpers ---------------------------------------------------------------
 
@@ -63,7 +59,33 @@ class SecretHandler(BaseHTTPRequestHandler):
         """Send a JSON error payload."""
         self._send_json({"error": message}, status=status)
 
-    # -- Auth ------------------------------------------------------------------
+    def _check_auth(self) -> bool:
+        """Validate the Bearer token if API auth is enabled.
+
+        Returns True if the request is authorized (or auth is disabled).
+        Returns False if auth is required but missing/invalid (and sends 401).
+        """
+        if not self.api_key:
+            # Auth not configured — allow all requests
+            return True
+
+        auth_header = self.headers.get("Authorization", "")
+        if not auth_header:
+            self._send_error(401, "Unauthorized: valid Bearer token required")
+            return False
+
+        token = auth_header[len("Bearer "):] if auth_header.startswith("Bearer ") else auth_header
+        if not token or not token.strip():
+            self._send_error(401, "Unauthorized: valid Bearer token required")
+            return False
+
+        if _secrets.compare_digest(token.strip(), self.api_key) if self.api_key else _secrets.compare_digest(token.strip(), ""):
+            return True
+
+        self._send_error(401, "Unauthorized: valid Bearer token required")
+        return False
+
+    # ── Routing ──────────────────────────────────────────────────────────────
 
     def _check_bearer_token(self) -> bool:
         """Check Bearer token -- static or OAuth2 introspection/userinfo.
@@ -289,21 +311,15 @@ class SecretHandler(BaseHTTPRequestHandler):
 
         # Health endpoint is always accessible (useful for load balancers)
         if path == "/health":
+            # /health is always accessible (useful for load balancers)
             self._handle_health()
-            return
-
-        # Auth info endpoint shows configured methods (no secrets exposed)
-        if path == "/auth/info":
-            self._handle_auth_info()
-            return
-
-        # All other endpoints require auth
-        if not self._check_auth():
-            return
-
-        if path == "/secrets":
+        elif path == "/secrets":
+            if not self._check_auth():
+                return
             self._handle_secrets_list(query)
         elif path.startswith("/secrets/"):
+            if not self._check_auth():
+                return
             key = path[len("/secrets/"):]
             self._handle_secrets_get(key)
         else:
@@ -403,12 +419,22 @@ def _get_encrypt_key() -> str | None:
         return None
 
 
+def _get_api_key(cli_key: str | None = None) -> str | None:
+    """Resolve the API authentication key.
+
+    Priority: explicit CLI flag > ENVAULT_API_KEY env var > None (auth disabled).
+    """
+    if cli_key:
+        return cli_key
+    return os.environ.get(API_KEY_ENV_VAR) or None
+
+
 def create_handler(
-     store: SecretStore,
-     config: EnvaultConfig,
-     encrypt_key: str | None = None,
-     api_token: str | None = None,
- ):
+    store: SecretStore,
+    config: EnvaultConfig,
+    encrypt_key: str | None = None,
+    api_key: str | None = None,
+):
     """Return a BaseHTTPRequestHandler subclass bound to the given store/config.
 
     This avoids mutating the class-level attributes on SecretHandler directly,
@@ -421,13 +447,7 @@ def create_handler(
     _Handler.store = store  # type: ignore[attr-defined]
     _Handler.config = config  # type: ignore[attr-defined]
     _Handler.encrypt_key = encrypt_key  # type: ignore[attr-defined]
-    _Handler.api_token = api_token  # type: ignore[attr-defined]
     _Handler.api_key = api_key  # type: ignore[attr-defined]
-    _Handler.auth_mode = auth_mode  # type: ignore[attr-defined]
-    _Handler.oauth_introspect_url = oauth_introspect_url  # type: ignore[attr-defined]
-    _Handler.oauth_userinfo_url = oauth_userinfo_url  # type: ignore[attr-defined]
-    _Handler.oauth_client_id = oauth_client_id  # type: ignore[attr-defined]
-    _Handler.oauth_client_secret = oauth_client_secret  # type: ignore[attr-defined]
     return _Handler
 
 
@@ -437,13 +457,7 @@ def run_server(
     host: str = "127.0.0.1",
     encrypt_key: str | None = None,
     store_name: str | None = None,
-    api_token: str | None = None,
     api_key: str | None = None,
-    auth_mode: str = "bearer",
-    oauth_introspect_url: str | None = None,
-    oauth_userinfo_url: str | None = None,
-    oauth_client_id: str | None = None,
-    oauth_client_secret: str | None = None,
 ) -> None:
     """Start the HTTP server for the secrets API.
 
@@ -454,39 +468,17 @@ def run_server(
     port : int
         Port to bind (default 8080).
     host : str
-        Bind address (default "127.0.0.1" -- localhost only for security).
+        Bind address (default "127.0.0.1" — localhost only for security).
     encrypt_key : str | None
         Encryption key; if *None* the key is read from ENVAULT_ENCRYPT_KEY or
         prompted interactively.
     store_name : str | None
         Named store from config to use; if *None* the default store is used.
-    api_token : str | None
-        Bearer token for API authentication. If *None*, reads from
-        ENVAULT_API_TOKEN env var. If still unset, API auth is disabled
-        with a warning (only safe on localhost).
     api_key : str | None
-        API key for X-API-Key header authentication. If *None*, reads from
-        ENVAULT_API_KEY env var.
-    auth_mode : str
-        Authentication mode: "bearer" (default), "api-key", "oauth2", or "any".
-        - "bearer": Bearer token only (static or OAuth2)
-        - "api-key": X-API-Key header only
-        - "oauth2": Bearer token validated via OAuth2 introspection or userinfo
-        - "any": Accept either X-API-Key or Bearer token
-    oauth_introspect_url : str | None
-        OAuth2 token introspection endpoint URL (RFC 7662). If *None*, reads
-        from ENVAULT_OAUTH_INTROSPECT_URL env var. When set, Bearer tokens
-        are validated by POSTing to this endpoint.
-    oauth_userinfo_url : str | None
-        OAuth2/OIDC userinfo endpoint URL. If *None*, reads from
-        ENVAULT_OAUTH_USERINFO_URL env var. When set, Bearer tokens are
-        validated by GETting this endpoint.
-    oauth_client_id : str | None
-        OAuth2 client ID for authenticated introspection. If *None*, reads
-        from ENVAULT_OAUTH_CLIENT_ID env var.
-    oauth_client_secret : str | None
-        OAuth2 client secret for authenticated introspection. If *None*, reads
-        from ENVAULT_OAUTH_CLIENT_SECRET env var.
+        Bearer token for API authentication. If provided, all /secrets
+        endpoints require an Authorization: Bearer <api-key> header.
+        If *None*, the ENVAULT_API_KEY env var is checked; if that is also
+        unset, auth is disabled (with a warning).
     """
 
     # Resolve encryption key (same auth model as decrypt command)
@@ -538,6 +530,9 @@ def run_server(
             "Set ENVAULT_API_TOKEN, ENVAULT_API_KEY, or ENVAULT_OAUTH_INTROSPECT_URL."
         )
 
+    # Resolve API key
+    resolved_api_key = _get_api_key(api_key)
+
     # Build the store instance
     if store_name and store_name in config.stores:
         store_instance = get_store(config.stores[store_name])
@@ -548,42 +543,21 @@ def run_server(
     else:
         store_instance = get_store("")
 
-    handler_class = create_handler(
-        store_instance, config, encrypt_key,
-        api_token=api_token,
-        api_key=api_key,
-        auth_mode=auth_mode,
-        oauth_introspect_url=oauth_introspect_url,
-        oauth_userinfo_url=oauth_userinfo_url,
-        oauth_client_id=oauth_client_id,
-        oauth_client_secret=oauth_client_secret,
-    )
+    handler_class = create_handler(store_instance, config, encrypt_key, resolved_api_key)
     server = HTTPServer((host, port), handler_class)
 
     from rich.console import Console
     console = Console()
     console.print(f"[green]✓[/green] envault serve listening on http://{host}:{port}")
-    console.print("  GET /secrets — list all secret keys")
-    console.print("  GET /secrets?prefix=X — filter keys by prefix")
-    console.print("  GET /secrets/{key} — get decrypted value")
-    console.print("  GET /health — store connectivity check")
-    console.print("  GET /auth/info — show configured auth methods")
-
-    # Auth status
-    if has_any_auth:
-        auth_parts = []
-        if api_token:
-            auth_parts.append("Bearer token")
-        if api_key:
-            auth_parts.append("X-API-Key")
-        if oauth_introspect_url:
-            auth_parts.append("OAuth2 introspect")
-        if oauth_userinfo_url:
-            auth_parts.append("OAuth2 userinfo")
-        auth_desc = " + ".join(auth_parts) if auth_parts else "configured"
-        console.print(f"[green]🔒[/green] API authentication enabled ({auth_desc}), mode: {auth_mode}")
+    console.print(" GET /secrets — list all secret keys")
+    console.print(" GET /secrets?prefix=X — filter keys by prefix")
+    console.print(" GET /secrets/{key} — get decrypted value")
+    console.print(" GET /health — store connectivity check")
+    if resolved_api_key:
+        console.print("[green]🔒[/green] API authentication enabled (Bearer token required)")
     else:
-        console.print("[yellow]⚠[/yellow] No API auth configured — secrets accessible without auth (localhost only)")
+        console.print("[yellow]⚠[/yellow] No API key set — secrets endpoints are unauthenticated!")
+        console.print("[dim]   Set --api-key flag or ENVAULT_API_KEY env var to enable auth[/dim]")
 
     console.print("[dim]Press Ctrl+C to stop[/dim]")
 

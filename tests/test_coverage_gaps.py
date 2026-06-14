@@ -243,3 +243,84 @@ def test_rotate_env_var_dry_run_with_audit(tmp_path):
     assert len(audit.get_history()) == 0
     # Original file should be unchanged
     assert "oldpass" in env_file.read_text()
+
+
+# ── diff.py: to_dict / to_json ───────────────────────────────────────────────
+
+
+def test_to_dict_identical():
+    """to_dict for identical envs should show no differences."""
+    result = diff_envs({"A": "1"}, {"A": "1"})
+    d = result.to_dict()
+    assert d["has_differences"] is False
+    assert d["total_differences"] == 0
+    assert d["only_in_source"] == {}
+    assert d["only_in_target"] == {}
+    assert d["different"] == {}
+    assert d["common_keys"] == ["A"]
+
+
+def test_to_dict_with_differences():
+    """to_dict should categorise added, removed, changed, and common keys."""
+    result = diff_envs(
+        {"A": "1", "B": "2", "C": "3"},
+        {"A": "1", "B": "changed", "D": "4"},
+    )
+    d = result.to_dict(source_label="dev", target_label="prod")
+    assert d["has_differences"] is True
+    assert d["total_differences"] == 3
+    assert d["only_in_source"] == {"C": "3"}
+    assert d["only_in_target"] == {"D": "4"}
+    assert d["different"] == {"B": {"dev": "2", "prod": "changed"}}
+    assert d["common_keys"] == ["A"]
+
+
+def test_to_dict_no_mask():
+    """to_dict with mask_values=False should return raw values."""
+    long_secret = "x" * 50
+    result = diff_envs({"K": long_secret}, {})
+    d = result.to_dict(mask_values=False)
+    assert d["only_in_source"]["K"] == long_secret
+
+
+def test_to_dict_with_mask():
+    """to_dict with mask_values=True (default) should mask long secret-like values."""
+    long_secret = "x" * 50
+    result = diff_envs({"K": long_secret}, {})
+    d = result.to_dict(mask_values=True)
+    assert "..." in d["only_in_source"]["K"]
+
+
+def test_to_json_parses():
+    """to_json should produce valid JSON that round-trips through to_dict."""
+    result = diff_envs({"X": "1", "Y": "2"}, {"X": "1", "Y": "changed", "Z": "3"})
+    import json
+    parsed = json.loads(result.to_json(source_label="s", target_label="t"))
+    assert parsed["has_differences"] is True
+    assert "Y" in parsed["different"]
+    assert parsed["different"]["Y"] == {"s": "2", "t": "changed"}
+
+
+def test_to_json_compact():
+    """to_json with indent=None should produce compact JSON."""
+    result = diff_envs({"A": "1"}, {"A": "2"})
+    compact = result.to_json(indent=None)
+    assert "\n" not in compact
+    import json
+    assert json.loads(compact)["has_differences"] is True
+
+
+def test_to_json_custom_labels():
+    """to_json should use custom source/target labels in the different dict."""
+    result = diff_envs({"K": "old"}, {"K": "new"})
+    import json
+    parsed = json.loads(result.to_json(source_label="staging", target_label="production"))
+    assert "staging" in parsed["different"]["K"]
+    assert "production" in parsed["different"]["K"]
+
+
+def test_to_dict_empty_common():
+    """to_dict with no common keys should have empty common_keys list."""
+    result = diff_envs({"A": "1"}, {"B": "2"})
+    d = result.to_dict()
+    assert d["common_keys"] == []

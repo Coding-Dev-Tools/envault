@@ -112,8 +112,13 @@ def diff(
     else:
         console.print(format_diff(result, label_s, label_t))
 
-    if not json_output and result.has_differences:
-        console.print(f"\nTotal: {result.total_differences} difference(s)")
+    if json_output:
+        console.print(result.to_json(source_label=label_s, target_label=label_t))
+    else:
+        console.print(format_diff(result, label_s, label_t))
+
+        if result.has_differences:
+            console.print(f"\nTotal: {result.total_differences} difference(s)")
 
     if fail_on_missing and result.only_in_source:
         raise typer.Exit(1)
@@ -131,17 +136,13 @@ def diff_files(
     ),
 ):
     """Diff two .env files directly (no config needed)."""
-    try:
-        result = diff_env_files(file1, file2)
-    except FileNotFoundError as e:
-        err_console.print(f"[red]Error:[/red] {e}")
-        raise typer.Exit(code=1) from None
+    result = diff_env_files(file1, file2)
     if json_output:
         console.print(result.to_json(source_label=Path(file1).name, target_label=Path(file2).name))
     else:
         console.print(format_diff(result, Path(file1).name, Path(file2).name))
-    if not json_output and result.has_differences:
-        console.print(f"\nTotal: {result.total_differences} difference(s)")
+        if result.has_differences:
+            console.print(f"\nTotal: {result.total_differences} difference(s)")
 
     if fail_on_missing and result.only_in_source:
         raise typer.Exit(1)
@@ -680,9 +681,8 @@ def backup_restore(
 def serve(
     port: int = typer.Option(8080, "--port", "-p", help="Port to listen on"),
     host: str = typer.Option("127.0.0.1", "--host", "-H", help="Bind address (default: localhost only)"),
-    password: str | None = typer.Option(
-        None, "--password", "-k",
-        help="Encryption password (prompted if omitted, or use ENVAULT_ENCRYPT_KEY)"),
+    password: str | None = typer.Option(None, "--password", "-k", help="Encryption password (prompted if omitted, or use ENVAULT_ENCRYPT_KEY)"),
+    api_key: str | None = typer.Option(None, "--api-key", help="Bearer token for API auth (or set ENVAULT_API_KEY)"),
     store: str | None = typer.Option(None, "--store", "-s", help="Named store from config to use"),
     config_path: str = typer.Option("", "--config", "-c", help="Config file path"),
     api_token: str | None = typer.Option(
@@ -692,32 +692,20 @@ def serve(
 
     Endpoints:
 
-    GET /secrets — list all secret keys (auth required if any auth is configured)
+ GET /secrets — list all secret keys
 
-    GET /secrets?prefix=X — filter keys by prefix
+ GET /secrets?prefix=X — filter keys by prefix
 
-    GET /secrets/{key} — get decrypted value for a key
+ GET /secrets/{key} — get decrypted value for a key
 
-    GET /health — store connectivity check (no auth required)
+ GET /health — store connectivity check
 
-    Authentication:
-
-    --auth-mode bearer (default): Bearer token via --api-token / ENVAULT_API_TOKEN
-
-    --auth-mode api-key: X-API-Key header via --api-key / ENVAULT_API_KEY
-
-    --auth-mode oauth2: Bearer token validated via OAuth2 introspection (--oauth-introspect-url)
-
-    --auth-mode any: Accept X-API-Key or Bearer token (tries X-API-Key first)
+    Security:
+ - Default bind is 127.0.0.1 (localhost only); use --host 0.0.0.0 to expose.
+ - Set --api-key or ENVAULT_API_KEY to require Bearer token auth on /secrets.
     """
     config = load_config(config_path)
-    run_server(
-        config, port=port, host=host, encrypt_key=password, store_name=store,
-        api_token=api_token, api_key=api_key, auth_mode=auth_mode,
-        oauth_introspect_url=oauth_introspect_url,
-        oauth_client_id=oauth_client_id,
-        oauth_client_secret=oauth_client_secret,
-    )
+    run_server(config, port=port, host=host, encrypt_key=password, store_name=store, api_key=api_key)
 
 
 # ── Version ─────────────────────────────────────────────────────────────────
