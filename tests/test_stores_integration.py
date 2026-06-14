@@ -4,8 +4,9 @@ Covers AwsSsmStore, VaultStore, deeper DopplerStore and OnePasswordStore,
 and __main__ module invocation.
 """
 
-import pytest
 from unittest.mock import MagicMock, patch
+
+import pytest
 
 # ── AwsSsmStore (mocked boto3) ───────────────────────────────────────────────
 
@@ -268,6 +269,7 @@ class TestDopplerStoreDeep:
 
     def test_get_found(self):
         import responses
+
         from envault.stores import DopplerStore
 
         store = DopplerStore(project="myapp", config="prd", token="dp-test")
@@ -280,6 +282,7 @@ class TestDopplerStoreDeep:
 
     def test_get_falls_back_to_computed(self):
         import responses
+
         from envault.stores import DopplerStore
 
         store = DopplerStore(project="myapp", config="prd", token="dp-test")
@@ -292,6 +295,7 @@ class TestDopplerStoreDeep:
 
     def test_list_keys_with_prefix(self):
         import responses
+
         from envault.stores import DopplerStore
 
         store = DopplerStore(project="myapp", config="prd", token="dp-test")
@@ -306,6 +310,7 @@ class TestDopplerStoreDeep:
 
     def test_delete_returns_false_on_non_204(self):
         import responses
+
         from envault.stores import DopplerStore
 
         store = DopplerStore(project="myapp", config="prd", token="dp-test")
@@ -317,6 +322,7 @@ class TestDopplerStoreDeep:
 
     def test_set_returns_false_on_non_200(self):
         import responses
+
         from envault.stores import DopplerStore
 
         store = DopplerStore(project="myapp", config="prd", token="dp-test")
@@ -335,6 +341,7 @@ class TestOnePasswordStoreDeep:
 
     def test_get_found(self):
         import responses
+
         from envault.stores import OnePasswordStore
 
         store = OnePasswordStore(token="fake", vault_id="v1")
@@ -357,6 +364,7 @@ class TestOnePasswordStoreDeep:
 
     def test_get_no_password_field(self):
         import responses
+
         from envault.stores import OnePasswordStore
 
         store = OnePasswordStore(token="fake", vault_id="v1")
@@ -377,6 +385,7 @@ class TestOnePasswordStoreDeep:
 
     def test_set_success(self):
         import responses
+
         from envault.stores import OnePasswordStore
 
         store = OnePasswordStore(token="fake", vault_id="v1")
@@ -389,6 +398,7 @@ class TestOnePasswordStoreDeep:
 
     def test_delete_found(self):
         import responses
+
         from envault.stores import OnePasswordStore
 
         store = OnePasswordStore(token="fake", vault_id="v1")
@@ -404,6 +414,7 @@ class TestOnePasswordStoreDeep:
 
     def test_delete_not_found(self):
         import responses
+
         from envault.stores import OnePasswordStore
 
         store = OnePasswordStore(token="fake", vault_id="v1")
@@ -417,6 +428,7 @@ class TestOnePasswordStoreDeep:
 
     def test_list_keys_with_prefix(self):
         import responses
+
         from envault.stores import OnePasswordStore
 
         store = OnePasswordStore(token="fake", vault_id="v1")

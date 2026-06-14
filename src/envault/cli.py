@@ -2,7 +2,13 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import typer
+from rich.console import Console
+from rich.prompt import Confirm
+from rich.table import Table
+
 from envault import __version__
 from envault.audit import AuditLogger
 from envault.backup import backup_env_file, format_backup_list, list_backups, restore_backup
@@ -15,10 +21,6 @@ from envault.security_audit import SecurityAuditResult, audit_env_file, format_a
 from envault.serve import run_server
 from envault.stores import get_store
 from envault.sync import sync_env_files
-from pathlib import Path
-from rich.console import Console
-from rich.prompt import Confirm
-from rich.table import Table
 
 app = typer.Typer(
     name="envault",
@@ -84,8 +86,10 @@ def diff(
     source_file: str | None = typer.Option(None, "--source", "-s", help="Source .env file path (overrides env name)"),
     target_file: str | None = typer.Option(None, "--target", "-t", help="Target .env file path (overrides env name)"),
     config_path: str = typer.Option("", "--config", "-c", help="Config file path"),
-    fail_on_missing: bool = typer.Option(False, "--fail-on-missing", help="Exit with code 1 if source has keys not in target"),
-    json_output: bool = typer.Option(False, "--json", help="Output result as JSON for programmatic use"),
+    fail_on_missing: bool = typer.Option(
+        False, "--fail-on-missing",
+        help="Exit with code 1 if source has keys not in target",
+    ),
 ):
     """Diff environment variables between two environments or .env files."""
     config = load_config(config_path)
@@ -121,8 +125,10 @@ def diff(
 def diff_files(
     file1: str = typer.Argument(..., help="First .env file"),
     file2: str = typer.Argument(..., help="Second .env file"),
-    fail_on_missing: bool = typer.Option(False, "--fail-on-missing", help="Exit with code 1 if source has keys not in target"),
-    json_output: bool = typer.Option(False, "--json", help="Output result as JSON for programmatic use"),
+    fail_on_missing: bool = typer.Option(
+        False, "--fail-on-missing",
+        help="Exit with code 1 if source has keys not in target",
+    ),
 ):
     """Diff two .env files directly (no config needed)."""
     try:
@@ -674,15 +680,13 @@ def backup_restore(
 def serve(
     port: int = typer.Option(8080, "--port", "-p", help="Port to listen on"),
     host: str = typer.Option("127.0.0.1", "--host", "-H", help="Bind address (default: localhost only)"),
-    password: str | None = typer.Option(None, "--password", "-k", help="Encryption password (prompted if omitted, or use ENVAULT_ENCRYPT_KEY)"),
+    password: str | None = typer.Option(
+        None, "--password", "-k",
+        help="Encryption password (prompted if omitted, or use ENVAULT_ENCRYPT_KEY)"),
     store: str | None = typer.Option(None, "--store", "-s", help="Named store from config to use"),
     config_path: str = typer.Option("", "--config", "-c", help="Config file path"),
-    api_token: str | None = typer.Option(None, "--api-token", "-t", help="Bearer token for API auth (or set ENVAULT_API_TOKEN)"),
-    api_key: str | None = typer.Option(None, "--api-key", help="API key for X-API-Key header auth (or set ENVAULT_API_KEY)"),
-    auth_mode: str = typer.Option("bearer", "--auth-mode", help="Auth mode: bearer (default), api-key, oauth2, any"),
-    oauth_introspect_url: str | None = typer.Option(None, "--oauth-introspect-url", help="OAuth2 token introspection endpoint URL (or set ENVAULT_OAUTH_INTROSPECT_URL)"),
-    oauth_client_id: str | None = typer.Option(None, "--oauth-client-id", help="OAuth2 client ID for introspection (or set ENVAULT_OAUTH_CLIENT_ID)"),
-    oauth_client_secret: str | None = typer.Option(None, "--oauth-client-secret", help="OAuth2 client secret for introspection (or set ENVAULT_OAUTH_CLIENT_SECRET)"),
+    api_token: str | None = typer.Option(
+        None, "--api-token", "-t", help="Bearer token for API auth (or set ENVAULT_API_TOKEN)"),
 ):
     """Start an HTTP server that exposes decrypted secrets as a JSON API.
 

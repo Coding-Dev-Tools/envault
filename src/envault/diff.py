@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import json
 import os
-from dotenv import dotenv_values
 from pathlib import Path
+
+from dotenv import dotenv_values
 
 
 def load_env_file(path: str | Path) -> dict[str, str]:

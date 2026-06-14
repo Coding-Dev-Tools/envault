@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
-import pytest
-from envault.cli import app
 from pathlib import Path
+
+import pytest
 from typer.testing import CliRunner
+
+from envault.cli import app
 
 
 @pytest.fixture
