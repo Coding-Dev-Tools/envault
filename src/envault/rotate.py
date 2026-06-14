@@ -64,6 +64,7 @@ def generate_api_key(prefix: str = "ev_") -> str:
 def generate_jwt_secret() -> str:
     """Generate a 256-bit JWT secret (base64-encoded 32 bytes)."""
     import base64
+
     return base64.urlsafe_b64encode(os.urandom(32)).decode().rstrip("=")
 
 
@@ -140,6 +141,8 @@ def rotate_env_var(
         return False, ""
 
     current_value = env_vars[key]
+    if current_value is None:
+        return False, ""
     new_value = rotate_value(key, current_value, length=length)
 
     if dry_run:
@@ -150,6 +153,7 @@ def rotate_env_var(
         content = f.read()
 
     import re
+
     # Match KEY=value or KEY="value" or KEY='value'
     pattern = re.compile(rf"^{re.escape(key)}\s*=\s*['\"]?.*?['\"]?\s*$", re.MULTILINE)
 

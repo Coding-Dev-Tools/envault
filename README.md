@@ -107,6 +107,36 @@ rh-envault store set DB_PASSWORD new_value --store my-vault
 rh-envault store delete DB_PASSWORD --store my-vault
 ```
 
+### `rh-envault serve`
+
+Expose decrypted secrets as an HTTP JSON API — perfect for MCP servers, CI/CD sidecars, and AI agent runtimes.
+
+```bash
+# Start the secrets API on port 8080
+rh-envault serve --port 8080
+
+# Custom host and password
+rh-envault serve --host 0.0.0.0 --port 3000 --password your-master-key
+```
+
+Endpoints:
+- `GET /health` — store connectivity check (no auth required)
+- `GET /secrets` — list all secret keys, optional `?prefix=X` filter (auth required)
+- `GET /secrets/{key}` — get decrypted value for a key (auth required)
+
+Authentication: Bearer token in the `Authorization` header. The token is the SHA-256 hex digest of your encryption key.
+
+```bash
+# List all secrets
+curl -H "Authorization: Bearer <sha256-of-encrypt-key>" http://localhost:8080/secrets
+
+# Filter by prefix
+curl -H "Authorization: Bearer <sha256-of-encrypt-key>" "http://localhost:8080/secrets?prefix=STRIPE"
+
+# Get a specific secret
+curl -H "Authorization: Bearer <sha256-of-encrypt-key>" http://localhost:8080/secrets/DB_PASSWORD
+```
+
 ### `rh-envault audit`
 
 View the audit log of all diff, sync, and rotate operations.
@@ -162,6 +192,7 @@ curl -H "Authorization: Bearer my-token" http://localhost:8080/secrets/DB_PASSWO
 - **Conflict resolution** — choose source-wins, target-wins, or interactive merge strategies
 - **Smart secret rotation** — auto-detects secret type (DB password, API key, JWT, webhook) and generates appropriate values
 - **Bulk rotation** — `rotate-all` with per-key dry-run preview
+- **HTTP secrets API** — `serve` command exposes decrypted secrets as a JSON REST API with Bearer token auth
 - **Secret store integration** — AWS SSM, HashiCorp Vault, Doppler, 1Password
 - **Secrets HTTP API** — `serve` exposes decrypted secrets over HTTP with Bearer token auth for MCP sidecars, CI/CD, and agent runtimes
 - **Audit trail** — every operation logged to `.envault-audit.log` with queryable CLI

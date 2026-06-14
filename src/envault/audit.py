@@ -24,7 +24,7 @@ class AuditLogger:
         details: dict | None = None,
     ):
         """Log an audit entry."""
-        entry = {
+        entry: dict[str, object] = {
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "action": action,
             "key": key,
@@ -68,7 +68,7 @@ class AuditLogger:
 
         return entries[-limit:]
 
-    def clear(self):
+    def clear(self) -> None:
         """Clear the audit log."""
         path = Path(self.log_path)
         if path.exists():

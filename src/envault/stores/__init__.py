@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 from abc import ABC, abstractmethod
 from pathlib import Path
+from typing import Any
 
 
 class SecretStoreError(Exception):
@@ -67,7 +68,7 @@ class LocalEnvStore(SecretStore):
         self._cache = load_env_file(self.env_file)
         return self._cache
 
-    def _invalidate(self):
+    def _invalidate(self) -> None:
         self._cache = None
 
     def get(self, key: str) -> str | None:
@@ -112,7 +113,7 @@ class AwsSsmStore(SecretStore):
         self.path_prefix = path_prefix.rstrip("/")
         self.region = region or os.environ.get("AWS_REGION", "us-east-1")
 
-    def _get_client(self):
+    def _get_client(self) -> Any:
         try:
             import boto3
         except ImportError:
@@ -179,7 +180,7 @@ class VaultStore(SecretStore):
         self.mount_point = mount_point
         self.path_prefix = path_prefix
 
-    def _get_client(self):
+    def _get_client(self) -> Any:
         try:
             import hvac
         except ImportError:
