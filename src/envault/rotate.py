@@ -150,8 +150,11 @@ def rotate_env_var(
         content = f.read()
 
     import re
-    # Match KEY=value or KEY="value" or KEY='value'
-    pattern = re.compile(rf"^{re.escape(key)}\s*=\s*['\"]?.*?['\"]?\s*$", re.MULTILINE)
+    # Match KEY=value or KEY="..." or KEY='...' — anchored to full value
+    pattern = re.compile(
+        rf"^{re.escape(key)}\s*=\s*(?:\"[^\"]*\"|'[^']*'|[^\n]*)$",
+        re.MULTILINE,
+    )
 
     # Escape new value for the .env file
     if any(c in new_value for c in " #'\"\n\t"):

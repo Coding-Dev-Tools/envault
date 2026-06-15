@@ -2,8 +2,7 @@
 
 from __future__ import annotations
 
-import json
-import os
+import io
 from dotenv import dotenv_values
 from pathlib import Path
 
@@ -18,14 +17,8 @@ def load_env_file(path: str | Path) -> dict[str, str]:
 
 def load_env_content(content: str) -> dict[str, str]:
     """Load environment variables from a string content."""
-    import tempfile
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".env", delete=False) as f:
-        f.write(content)
-        tmp = f.name
-    try:
-        return {k: v for k, v in dotenv_values(tmp).items() if k is not None and v is not None}
-    finally:
-        os.unlink(tmp)
+    stream = io.StringIO(content)
+    return {k: v for k, v in dotenv_values(stream=stream).items() if k is not None and v is not None}
 
 
 class EnvDiffResult:
