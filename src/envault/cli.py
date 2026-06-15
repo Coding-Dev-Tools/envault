@@ -15,10 +15,14 @@ from envault.security_audit import SecurityAuditResult, audit_env_file, format_a
 from envault.serve import run_server
 from envault.stores import get_store
 from envault.sync import sync_env_files
-from pathlib import Path
-from rich.console import Console
-from rich.prompt import Confirm
-from rich.table import Table
+
+try:
+    from revenueholdings_license import require_license
+except ImportError:
+    import warnings
+    warnings.warn("revenueholdings-license not installed; license checks skipped", stacklevel=2)
+    def require_license(product: str) -> None:  # type: ignore[misc]
+        pass
 
 app = typer.Typer(
     name="envault",
@@ -27,6 +31,11 @@ app = typer.Typer(
 )
 console = Console()
 err_console = Console(stderr=True)
+
+
+@app.callback()
+def main_callback():
+    require_license("envault")
 
 
 def load_config(config_path: str = "") -> EnvaultConfig:
