@@ -2,7 +2,21 @@
 
 from __future__ import annotations
 
+import sys
+from pathlib import Path
+
+# Ensure UTF-8 output on Windows consoles that default to cp1252
+if sys.platform == "win32":
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")
+        sys.stderr.reconfigure(encoding="utf-8")
+    except Exception:
+        pass
+
 import typer
+from rich.console import Console
+from rich.prompt import Confirm
+from rich.table import Table
 from envault import __version__
 from envault.audit import AuditLogger
 from envault.backup import backup_env_file, format_backup_list, list_backups, restore_backup

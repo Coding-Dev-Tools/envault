@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import io
+import json
 from dotenv import dotenv_values
 from pathlib import Path
 
