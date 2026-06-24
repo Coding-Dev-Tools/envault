@@ -15,35 +15,35 @@
 
 ## Quick Start
 
-> **Note:** rh-envault is not yet published to PyPI. Install directly from GitHub.
+> **Note:** envault is not yet published to PyPI. Install directly from GitHub.
 
 ```bash
 pip install git+https://github.com/Coding-Dev-Tools/envault.git
 
 # Initialize a project
-rh-envault init my-project
+envault init my-project
 
 # Diff environments
-rh-envault diff dev prod
+envault diff dev prod
 
 # Sync staging → prod
-rh-envault sync staging prod
+envault sync staging prod
 
 # Rotate a secret
-rh-envault rotate DB_PASSWORD
+envault rotate DB_PASSWORD
 ```
 
 ## Commands
 
-### `rh-envault init <project>`
+### `envault init <project>`
 
 Initialize a `.envault.yml` config file with sensible defaults.
 
 ```bash
-rh-envault init my-project
+envault init my-project
 ```
 
-### `rh-envault diff <source> <target>`
+### `envault diff <source> <target>`
 
 Diff environment variables between two environments or `.env` files. Shows keys that are:
 - Only in source
@@ -51,41 +51,41 @@ Diff environment variables between two environments or `.env` files. Shows keys 
 - Present in both but with different values
 
 ```bash
-rh-envault diff dev staging
-rh-envault diff prod staging
-rh-envault diff-files .env.dev .env.prod
+envault diff dev staging
+envault diff prod staging
+envault diff-files .env.dev .env.prod
 ```
 
-### `rh-envault sync <source> <target>`
+### `envault sync <source> <target>`
 
 Sync environment variables from one environment to another with conflict resolution strategies.
 
 ```bash
 # Sync staging → prod (source values win conflicts)
-rh-envault sync staging prod
+envault sync staging prod
 
 # Dry run first
-rh-envault sync staging prod --dry-run
+envault sync staging prod --dry-run
 
 # Keep target values on conflict
-rh-envault sync staging prod --strategy target_wins
+envault sync staging prod --strategy target_wins
 
 # Delete keys in target that don't exist in source
-rh-envault sync staging prod --allow-delete
+envault sync staging prod --allow-delete
 
 # Skip certain keys
-rh-envault sync staging prod --skip DB_HOST --skip DB_PORT
+envault sync staging prod --skip DB_HOST --skip DB_PORT
 ```
 
-### `rh-envault rotate <key>`
+### `envault rotate <key>`
 
 Rotate a single environment variable with an auto-generated cryptographically secure value.
 
 ```bash
-rh-envault rotate DB_PASSWORD
-rh-envault rotate API_KEY --env prod
-rh-envault rotate JWT_SECRET --length 64 --dry-run --show
-rh-envault rotate-all --env prod
+envault rotate DB_PASSWORD
+envault rotate API_KEY --env prod
+envault rotate JWT_SECRET --length 64 --dry-run --show
+envault rotate-all --env prod
 ```
 
 Smart rotation infers the type of secret:
@@ -95,41 +95,41 @@ Smart rotation infers the type of secret:
 - `WEBHOOK_SECRET` → long hex key
 - Everything else → 32-char random string
 
-### `rh-envault store`
+### `envault store`
 
 Manage secret store integrations — read, write, and list secrets from external stores.
 
 ```bash
-rh-envault store list
-rh-envault store list --prefix /production/
-rh-envault store get DB_PASSWORD --store my-vault
-rh-envault store set DB_PASSWORD new_value --store my-vault
-rh-envault store delete DB_PASSWORD --store my-vault
+envault store list
+envault store list --prefix /production/
+envault store get DB_PASSWORD --store my-vault
+envault store set DB_PASSWORD new_value --store my-vault
+envault store delete DB_PASSWORD --store my-vault
 ```
 
-### `rh-envault audit`
+### `envault audit`
 
 View the audit log of all diff, sync, and rotate operations.
 
 ```bash
-rh-envault audit
-rh-envault audit --key DB_PASSWORD
-rh-envault audit --action rotate --limit 100
+envault audit
+envault audit --key DB_PASSWORD
+envault audit --action rotate --limit 100
 ```
 
-### `rh-envault serve`
+### `envault serve`
 
 Start an HTTP server that exposes decrypted secrets as a JSON API — ideal for MCP server sidecars, CI/CD pipelines, and AI agent runtimes.
 
 ```bash
 # Start the secrets API on port 8080 (default)
-rh-envault serve
+envault serve
 
 # Custom port, host, and API key
-rh-envault serve --port 3000 --host 0.0.0.0 --api-key my-bearer-token
+envault serve --port 3000 --host 0.0.0.0 --api-key my-bearer-token
 
 # Use a named store from config
-rh-envault serve --store production-secrets
+envault serve --store production-secrets
 ```
 
 **Endpoints:**
@@ -147,13 +147,13 @@ rh-envault serve --store production-secrets
 
 ```bash
 # Fetch secrets with curl
-curl -H "Authorization: Bearer my-token" http://localhost:8080/secrets
+curl -H "Authorization: Bearer ***" http://localhost:8080/secrets
 
 # Filter by prefix
-curl -H "Authorization: Bearer my-token" "http://localhost:8080/secrets?prefix=STRIPE"
+curl -H "Authorization: Bearer ***" "http://localhost:8080/secrets?prefix=STRIPE"
 
 # Get a specific secret
-curl -H "Authorization: Bearer my-token" http://localhost:8080/secrets/DB_PASSWORD
+curl -H "Authorization: Bearer ***" http://localhost:8080/secrets/DB_PASSWORD
 ```
 
 ## Features
@@ -238,23 +238,23 @@ audit_log_path: .envault-audit.log
 
 | Store | Package | Install (from GitHub) |
 |-------|---------|----------------------|
-| AWS SSM | `boto3` | `pip install "rh-envault[awsssm] @ git+https://..."` |
-| HashiCorp Vault | `hvac` | `pip install "rh-envault[vault] @ git+https://..."` |
-| Doppler | `requests` | `pip install "rh-envault[doppler] @ git+https://..."` |
-| 1Password | `onepasswordconnectsdk` | `pip install "rh-envault[onepassword] @ git+https://..."` |
+| AWS SSM | `boto3` | `pip install "envault[awsssm] @ git+https://..."` |
+| HashiCorp Vault | `hvac` | `pip install "envault[vault] @ git+https://..."` |
+| Doppler | `requests` | `pip install "envault[doppler] @ git+https://..."` |
+| 1Password | `onepasswordconnectsdk` | `pip install "envault[onepassword] @ git+https://..."` |
 
 ## CI/CD Integration
 
 ```bash
 # Block deployment if production has secrets that staging doesn't
-rh-envault diff staging prod --fail-on-missing
+envault diff staging prod --fail-on-missing
 
 # Rotate a secret and sync to all environments
-rh-envault rotate DB_PASSWORD --env staging
-rh-envault sync staging prod
+envault rotate DB_PASSWORD --env staging
+envault sync staging prod
 
 # Audit before deployment
-rh-envault audit --action rotate --limit 20
+envault audit --action rotate --limit 20
 ```
 
 ## Storage
