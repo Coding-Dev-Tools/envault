@@ -126,7 +126,7 @@ Start an HTTP server that exposes decrypted secrets as a JSON API — ideal for 
 envault serve
 
 # Custom port, host, and API key
-envault serve --port 3000 --host 0.0.0.0 --api-key my-bearer-token
+envault serve --port 3000 --host 0.0.0.0 --api-key <YOUR_API_KEY>
 
 # Use a named store from config
 envault serve --store production-secrets
