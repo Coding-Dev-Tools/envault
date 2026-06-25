@@ -4,13 +4,10 @@ from __future__ import annotations
 
 import io
 import json
-from unittest.mock import MagicMock
-
-
 from envault.config import EnvaultConfig
 from envault.serve import SecretHandler, create_handler
 from envault.stores import LocalEnvStore
-
+from unittest.mock import MagicMock
 
 # ── Fixtures ───────────────────────────────────────────────────────────────────
 
@@ -39,18 +36,19 @@ class _FakeStore:
         return keys
 
 
-def _make_handler(store, config: EnvaultConfig | None = None):
+def _make_handler(store, config: EnvaultConfig | None = None, encrypt_key: str = "test-key"):
     """Create a handler class bound to the given store and return a mock instance.
 
     We create a mock request handler that has the routing logic from
     SecretHandler but uses pre-set wfile/rfile so we can inspect output.
     """
     config = config or EnvaultConfig()
-    handler_class = create_handler(store, config, encrypt_key="test-key")
+    handler_class = create_handler(store, config, encrypt_key=encrypt_key)
 
     # Build a minimal instance that has enough of BaseHTTPRequestHandler
     # wired up to test do_GET routing and response writing.
     instance = _build_handler_instance(handler_class)
+    instance.headers = {"Authorization": f"Bearer {encrypt_key}"}
     return instance
 
 
@@ -81,7 +79,7 @@ def _build_handler_instance(handler_class):
     instance._sent_body = None
 
     # Override _send_json to capture output instead of writing raw bytes
-    handler_class._send_json  # verify attribute exists before patching
+    _ = handler_class._send_json  # verify attribute exists before patching
 
     def _capturing_send_json(self_inner, data, status=200):
         self_inner._sent_json = data
@@ -95,6 +93,7 @@ def _build_handler_instance(handler_class):
         self_inner.wfile.write(body)
 
     instance._send_json = lambda data, status=200: _capturing_send_json(instance, data, status)
+
 
     return instance
 
@@ -320,8 +319,8 @@ class TestServeCLI:
 
     def test_serve_help(self):
         """serve --help should show endpoint descriptions."""
-        from typer.testing import CliRunner
         from envault.cli import app
+        from typer.testing import CliRunner
 
         runner = CliRunner()
         result = runner.invoke(app, ["serve", "--help"])
@@ -332,8 +331,8 @@ class TestServeCLI:
     def test_serve_no_encrypt_key_exits(self, tmp_path):
         """serve without any encryption key should exit with error."""
         import os
-        from typer.testing import CliRunner
         from envault.cli import app
+        from typer.testing import CliRunner
 
         env_file = tmp_path / ".env"
         env_file.write_text("KEY=val\n")
