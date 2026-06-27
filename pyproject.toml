@@ -9,7 +9,7 @@ description = "Env variable syncing, diffing, and secret rotation CLI with secre
 readme = "README.md"
 requires-python = ">=3.10"
 license = "MIT"
-authors = [{name = "Revenue Holdings"}]
+authors = [{name = "DevForge"}]
 keywords = ["env", "secrets", "cli", "dotenv", "vault", "aws-ssm", "secret-rotation"]
 classifiers = [
  "Development Status :: 4 - Beta",
