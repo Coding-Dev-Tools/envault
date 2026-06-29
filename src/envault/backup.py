@@ -149,6 +149,7 @@ def backup_env_file(
         # Store encrypted backup with .locked suffix
         backup_file = backup_dir / (backup_name + ".locked")
         from envault.encrypt import encrypt_env
+
         encrypt_env(source_path, output_path=backup_file, password=password)
     else:
         backup_file = backup_dir / backup_name
@@ -232,6 +233,7 @@ def restore_backup(
 
     if entry.encrypted:
         from envault.encrypt import decrypt_env
+
         decrypt_env(backup_file, output_path=restore_path, password=password)
     else:
         # Ensure parent directory exists
