@@ -158,10 +158,10 @@ def test_diff_files_not_found(runner: CliRunner, tmp_path):
     """diff-files on non-existent files should error with a clear message."""
     result = runner.invoke(app, ["diff-files", str(tmp_path / "nope1.env"), str(tmp_path / "nope2.env")])
     assert result.exit_code == 1
-    assert "not found" in result.output.lower() or "error" in result.output.lower()
+    assert "not found" in " ".join(result.output.lower().split()) or "error" in result.output.lower()
 
 
-def test_diff_files_json_output(runner: CliRunner, tmp_path):
+def test_diff_files_json_output_with_only_keys(runner: CliRunner, tmp_path):
     """diff-files --json should produce valid JSON with diff categories."""
     import json as _json
 
@@ -180,7 +180,7 @@ def test_diff_files_json_output(runner: CliRunner, tmp_path):
     assert "SHARED" in parsed["common_keys"]
 
 
-def test_diff_files_json_identical(runner: CliRunner, tmp_path):
+def test_diff_files_json_identical_multi_key(runner: CliRunner, tmp_path):
     """diff-files --json with identical files should show no differences."""
     import json as _json
 
@@ -196,7 +196,7 @@ def test_diff_files_json_identical(runner: CliRunner, tmp_path):
     assert parsed["total_differences"] == 0
 
 
-def test_diff_with_config_json(runner: CliRunner, tmp_path):
+def test_diff_with_config_json_key_labels(runner: CliRunner, tmp_path):
     """diff --json with config and explicit file overrides should output JSON."""
     import json as _json
 
@@ -853,7 +853,7 @@ def test_history_file_not_found(tmp_path, runner: CliRunner):
 
     result = runner.invoke(app, ["history", "dev", "--config", str(config_path)])
     assert result.exit_code != 0
-    assert "not found" in result.output.lower()
+    assert "not found" in " ".join(result.output.lower().split())
 
 
 def test_history_direct_file(tmp_path, runner: CliRunner):
