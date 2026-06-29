@@ -133,6 +133,12 @@ def diff_files(
     json_output: bool = typer.Option(False, "--json", "-j", help="Output as JSON"),
 ):
     """Diff two .env files directly (no config needed)."""
+    if not Path(file1).exists():
+        err_console.print(f"[red]Error:[/red] File not found: {file1}")
+        raise typer.Exit(1)
+    if not Path(file2).exists():
+        err_console.print(f"[red]Error:[/red] File not found: {file2}")
+        raise typer.Exit(1)
     result = diff_env_files(file1, file2)
     if json_output:
         console.print(result.to_json(source_label=Path(file1).name, target_label=Path(file2).name))
