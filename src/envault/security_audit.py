@@ -164,9 +164,8 @@ def _is_hardcoded_secret(key: str, value: str) -> tuple[bool, str]:
         if pattern.search(value):
             # For base64 patterns, require some non-alphanumeric chars to avoid
             # false positives on long alphanumeric strings (e.g. "aVeryStrongRandomValue12345")
-            if description in ("Base64-encoded secret detected", "Possible AWS Secret Access Key"):
-                if not re.search(r"[/+=]", value):
-                    continue
+            if description in ("Base64-encoded secret detected", "Possible AWS Secret Access Key") and not re.search(r"[/+=]", value):
+                continue
             return True, description
     return False, ""
 
@@ -294,15 +293,14 @@ def _check_gitignore(file_path: Path) -> list[SecurityIssue]:
         ))
 
     # Don't flag missing gitignore if we already flagged a specific file issue
-    if not gitignore_found and not issues:
-        if repo_root_found:
-            issues.append(SecurityIssue(
-                severity="medium",
-                category="gitignore",
-                key="",
-                message="No .gitignore found — .env files may be committed to version control",
-                suggestion="Add a .gitignore and include .env files",
-            ))
+    if not gitignore_found and not issues and repo_root_found:
+        issues.append(SecurityIssue(
+            severity="medium",
+            category="gitignore",
+            key="",
+            message="No .gitignore found — .env files may be committed to version control",
+            suggestion="Add a .gitignore and include .env files",
+        ))
 
     return issues
 
@@ -447,15 +445,14 @@ def audit_env_file(file_path: str | Path, *, check_permissions: bool = True, che
             ))
 
         # 6. Unquoted values with special characters (shell injection risk)
-        if raw_value.strip() and not raw_value.strip().startswith(('"', "'")):
-            if any(c in value for c in " $`\\!#"):
-                result.issues.append(SecurityIssue(
-                    severity="low",
-                    category="unquoted_value",
-                    key=key,
-                    message=f"'{key}' has unquoted value containing special characters — may cause shell expansion issues",
-                    suggestion="Quote the value: {key}=\"{value}\"",
-                ))
+        if raw_value.strip() and not raw_value.strip().startswith(('"', "'")) and any(c in value for c in " $`\\!#"):
+            result.issues.append(SecurityIssue(
+                severity="low",
+                category="unquoted_value",
+                key=key,
+                message=f"'{key}' has unquoted value containing special characters — may cause shell expansion issues",
+                suggestion="Quote the value: {key}=\"{value}\"",
+            ))
 
         # 7. Inline comments without quoting (dotenv misparse risk)
         if not raw_value.strip().startswith(('"', "'")) and " #" in raw_value:
