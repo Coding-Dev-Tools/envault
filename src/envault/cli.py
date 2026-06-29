@@ -109,7 +109,7 @@ def diff(
         raise typer.Exit(code=1) from None
 
     if json_output:
-        console.print(result.to_json(source_label=label_s, target_label=label_t))
+        print(result.to_json(source_label=label_s, target_label=label_t))
     else:
         console.print(format_diff(result, label_s, label_t))
 
@@ -141,7 +141,7 @@ def diff_files(
         raise typer.Exit(1)
     result = diff_env_files(file1, file2)
     if json_output:
-        console.print(result.to_json(source_label=Path(file1).name, target_label=Path(file2).name))
+        print(result.to_json(source_label=Path(file1).name, target_label=Path(file2).name))
     else:
         console.print(format_diff(result, Path(file1).name, Path(file2).name))
         if result.has_differences:
@@ -526,7 +526,7 @@ def scan(
                 ],
             }
             output.append(entry)
-        console.print(_json.dumps(output, indent=2))
+        print(_json.dumps(output, indent=2))
     else:
         report = format_audit_report(results, verbose=verbose)
         console.print(report)
@@ -568,7 +568,7 @@ def history(
     )
 
     if json_output:
-        console.print(result.to_json(mask_values=not verbose))
+        print(result.to_json(mask_values=not verbose))
     else:
         console.print(format_history(result, verbose=verbose))
 
@@ -622,7 +622,7 @@ def backup_create(
             result.errors.append(str(e))
 
     if json_output:
-        console.print(result.to_json())
+        print(result.to_json())
     else:
         for entry in result.backups:
             enc_tag = " (encrypted)" if entry.encrypted else ""
@@ -644,7 +644,7 @@ def backup_list(
 
     if json_output:
         import json
-        console.print(json.dumps([e.to_dict() for e in entries], indent=2))
+        print(json.dumps([e.to_dict() for e in entries], indent=2))
     else:
         if not entries:
             console.print("[yellow]No backups found[/yellow]")
@@ -667,7 +667,7 @@ def backup_restore(
         restored_path = restore_backup(name, target_path=target, password=password)
         if json_output:
             import json
-            console.print(json.dumps({"restored_to": str(restored_path)}))
+            print(json.dumps({"restored_to": str(restored_path)}))
         else:
             console.print(f"[green]✓[/green] Restored → {restored_path}")
     except ValueError as e:
@@ -719,7 +719,7 @@ def serve(
 @app.command()
 def version() -> None:
     """Show version."""
-    console.print(f"envault v{__version__}")
+    print(f"envault v{__version__}")
 
 
 if __name__ == "__main__":
