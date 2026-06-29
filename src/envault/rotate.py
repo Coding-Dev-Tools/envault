@@ -89,11 +89,16 @@ def rotate_value(
     key_lower = key.lower()
 
     # Database passwords
-    if any(db_kw in key_lower for db_kw in ["db_", "database", "dbpassword", "db_pass"]):
+    if any(
+        db_kw in key_lower for db_kw in ["db_", "database", "dbpassword", "db_pass"]
+    ):
         return generate_db_password()
 
     # API keys
-    if any(api_kw in key_lower for api_kw in ["api_key", "apikey", "api_secret", "apisecret"]):
+    if any(
+        api_kw in key_lower
+        for api_kw in ["api_key", "apikey", "api_secret", "apisecret"]
+    ):
         prefix = key.split("_")[0].lower()[:4] + "_"
         return generate_api_key(prefix=prefix)
 
@@ -153,6 +158,7 @@ def rotate_env_var(
         content = f.read()
 
     import re
+
     # Match KEY=value or KEY="..." or KEY='...' — anchored to full value
     pattern = re.compile(
         rf"^{re.escape(key)}\s*=\s*(?:\"[^\"]*\"|'[^']*'|[^\n]*)$",
