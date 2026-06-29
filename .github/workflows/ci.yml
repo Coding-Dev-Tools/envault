@@ -32,25 +32,30 @@ jobs:
           pip install --upgrade pip setuptools wheel
           pip install -e ".[dev]" --no-build-isolation
 
+      - name: Show installed packages
+        run: pip list | grep -E "ruff|pytest|rich|typer|pydantic|cryptography|responses|dotenv"
+
       - name: Lint with ruff
         run: pip install ruff && ruff check src/ --target-version py310
 
       - name: Run tests
+        id: runtests
+        shell: bash
         run: |
-          python -m pytest tests/ -v --tb=long 2>&1 | tee /tmp/pytest-output.txt
-          exit ${PIPESTATUS[0]}
-
-      - name: Show test output on failure
-        if: failure()
-        run: |
-          echo "=== Python version ==="
-          python --version
-          echo "=== Ruff version ==="
-          python -m ruff --version
-          echo "=== Installed packages ==="
-          pip list
-          echo "=== Last 200 lines of test output ==="
-          tail -200 /tmp/pytest-output.txt || true
+          set -o pipefail
+          python -m pytest tests/ -v --tb=short 2>&1 | tee /tmp/pytest-out.txt
+          PYTEST_RC=${PIPESTATUS[0]}
+          if [ $PYTEST_RC -ne 0 ]; then
+            echo "::error::Tests failed with exit code $PYTEST_RC"
+            grep -E "^FAILED|^ERROR" /tmp/pytest-out.txt | head -30 | while IFS= read -r line; do
+              echo "::error::$line"
+            done
+            echo "::warning::=== SUMMARY ==="
+            tail -30 /tmp/pytest-out.txt | while IFS= read -r line; do
+              echo "::warning::$line"
+            done
+          fi
+          exit $PYTEST_RC
 
       - name: Check CLI works
         run: |
