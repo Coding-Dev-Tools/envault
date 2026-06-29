@@ -13,11 +13,13 @@ from envault.sync import SyncConflict, sync_env_files, sync_envs, write_env_file
 
 # ── Version ─────────────────────────────────────────────────────────────────
 
+
 def test_version():
     assert __version__ == "0.1.0"
 
 
 # ── Config ──────────────────────────────────────────────────────────────────
+
 
 def test_config_defaults():
     config = EnvaultConfig()
@@ -76,7 +78,9 @@ def test_init_config_no_example(tmp_path):
     """init_config with generate_example=False should skip .env.example."""
     path = tmp_path / ".envault.yml"
     example_path = tmp_path / ".env.example"
-    config = init_config("my-project", str(path), generate_example=False, example_path=str(example_path))
+    config = init_config(
+        "my-project", str(path), generate_example=False, example_path=str(example_path)
+    )
     assert config.project == "my-project"
     assert path.exists()
     assert not example_path.exists()
@@ -96,6 +100,7 @@ def test_config_get_env_names():
 
 
 # ── Diff ────────────────────────────────────────────────────────────────────
+
 
 def test_diff_envs_identical():
     env_a = {"DB_HOST": "localhost", "DB_PORT": "5432"}
@@ -184,7 +189,10 @@ def test_diff_result_to_dict_identical():
 def test_diff_result_to_dict_masking():
     """to_dict should mask long secret-like values by default."""
     result = diff_envs(
-        {"SHORT": "abc", "LONG_SECRET": "a_very_long_secret_value_that_exceeds_16_chars"},
+        {
+            "SHORT": "abc",
+            "LONG_SECRET": "a_very_long_secret_value_that_exceeds_16_chars",
+        },
         {"SHORT": "abc"},  # SHORT is common, not only_in_source
     )
     d = result.to_dict()
@@ -201,12 +209,16 @@ def test_diff_result_to_dict_no_mask():
         {},
     )
     d = result.to_dict(mask_values=False)
-    assert d["only_in_source"]["SECRET"] == "a_very_long_secret_value_that_exceeds_16_chars"
+    assert (
+        d["only_in_source"]["SECRET"]
+        == "a_very_long_secret_value_that_exceeds_16_chars"
+    )
 
 
 def test_diff_result_to_json_valid():
     """to_json should return valid JSON that round-trips with to_dict."""
     import json as _json
+
     result = diff_envs(
         {"A": "1", "B": "2"},
         {"A": "1", "C": "3"},
@@ -219,6 +231,7 @@ def test_diff_result_to_json_valid():
 def test_diff_result_to_json_compact():
     """to_json with indent=None should produce compact JSON."""
     import json as _json
+
     result = diff_envs({"A": "1"}, {"A": "2"})
     json_str = result.to_json(indent=None)
     assert "\n" not in json_str
@@ -233,9 +246,13 @@ def test_load_env_file_not_exists(tmp_path):
 
 def test_load_env_content():
     from envault.diff import load_env_content
+
     assert load_env_content("KEY=one\nFOO=two\n") == {"KEY": "one", "FOO": "two"}
     assert load_env_content("") == {}
-    assert load_env_content("# comment\nKEY=val\n\nFOO=bar\n") == {"KEY": "val", "FOO": "bar"}
+    assert load_env_content("# comment\nKEY=val\n\nFOO=bar\n") == {
+        "KEY": "val",
+        "FOO": "bar",
+    }
 
 
 def test_format_diff_identical():
@@ -247,10 +264,15 @@ def test_format_diff_identical():
 def test_format_diff_different():
     result = diff_envs({"A": "1", "B": "2"}, {"A": "x", "C": "3"})
     output = format_diff(result)
-    assert "Only in source" in output or "Differing" in output or "Only in target" in output
+    assert (
+        "Only in source" in output
+        or "Differing" in output
+        or "Only in target" in output
+    )
 
 
 # ── Sync ────────────────────────────────────────────────────────────────────
+
 
 def test_sync_envs_add():
     source = {"A": "1", "B": "2"}
@@ -328,23 +350,36 @@ def test_sync_env_files(tmp_path):
 
 # ── Rotate ──────────────────────────────────────────────────────────────────
 
+
 def test_generate_secret_length():
     secret = generate_secret(64)
     assert len(secret) == 64
 
 
 def test_generate_secret_chars():
-    secret = generate_secret(100, use_upper=True, use_lower=True, use_digits=True, use_symbols=False)
+    secret = generate_secret(
+        100, use_upper=True, use_lower=True, use_digits=True, use_symbols=False
+    )
     assert all(c.isalnum() for c in secret)
 
 
 def test_generate_secret_no_symbols():
     secret = generate_secret(100, use_symbols=False)
-    assert all(c in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789" for c in secret)
+    assert all(
+        c in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+        for c in secret
+    )
 
 
 def test_generate_secret_exclude():
-    secret = generate_secret(100, use_upper=True, use_lower=True, use_digits=True, use_symbols=False, exclude_chars="abc")
+    secret = generate_secret(
+        100,
+        use_upper=True,
+        use_lower=True,
+        use_digits=True,
+        use_symbols=False,
+        exclude_chars="abc",
+    )
     assert "a" not in secret
     assert "b" not in secret
     assert "c" not in secret
@@ -395,6 +430,7 @@ def test_rotate_env_var_not_found(tmp_path):
 
 # ── Audit ───────────────────────────────────────────────────────────────────
 
+
 def test_audit_log_basic(tmp_path):
     log = AuditLogger(str(tmp_path / "audit.log"))
     log.log("rotate", "DB_PASSWORD", env_file=".env.prod")
@@ -428,17 +464,20 @@ def test_audit_log_clear(tmp_path):
 
 # ── Stores ──────────────────────────────────────────────────────────────────
 
+
 class TestDopplerStore:
     """Tests for DopplerStore (mocked)."""
 
     def test_init_defaults(self):
         from envault.stores import DopplerStore
+
         store = DopplerStore()
         assert store.project == ""
         assert store.config == "prd"
 
     def test_init_with_project(self):
         from envault.stores import DopplerStore
+
         store = DopplerStore(project="myapp", config="dev")
         assert store.project == "myapp"
         assert store.config == "dev"
@@ -447,6 +486,7 @@ class TestDopplerStore:
         import responses
 
         from envault.stores import DopplerStore
+
         store = DopplerStore(project="test", config="dev", token="fake-token")
         url = "https://api.doppler.com/v3/configs/config/secrets"
         with responses.RequestsMock() as rsps:
@@ -458,6 +498,7 @@ class TestDopplerStore:
         import responses
 
         from envault.stores import DopplerStore
+
         store = DopplerStore(project="test", config="dev", token="fake-token")
         url = "https://api.doppler.com/v3/configs/config/secrets"
         with responses.RequestsMock() as rsps:
@@ -469,6 +510,7 @@ class TestDopplerStore:
         import responses
 
         from envault.stores import DopplerStore
+
         store = DopplerStore(project="test", config="dev", token="fake-token")
         base = "https://api.doppler.com/v3/configs/config/secrets"
         with responses.RequestsMock() as rsps:
@@ -483,6 +525,7 @@ class TestOnePasswordStore:
 
     def test_init_defaults(self):
         from envault.stores import OnePasswordStore
+
         store = OnePasswordStore()
         assert store.url == "http://localhost:8080"
 
@@ -490,6 +533,7 @@ class TestOnePasswordStore:
         import responses
 
         from envault.stores import OnePasswordStore
+
         store = OnePasswordStore(token="fake", vault_id="vault1")
         url = "http://localhost:8080/v1/vaults/vault1/items?filter=title%20eq%20%22K%22"
         with responses.RequestsMock() as rsps:
@@ -500,6 +544,7 @@ class TestOnePasswordStore:
         import responses
 
         from envault.stores import OnePasswordStore
+
         store = OnePasswordStore(token="fake", vault_id="vault1")
         url = "http://localhost:8080/v1/vaults/vault1/items"
         with responses.RequestsMock() as rsps:
@@ -512,6 +557,7 @@ class TestLocalEnvStore:
 
     def test_get_set_delete(self, tmp_path):
         from envault.stores import LocalEnvStore
+
         env_file = tmp_path / ".env"
         env_file.write_text("KEY=value\n")
         store = LocalEnvStore(str(env_file))
@@ -524,6 +570,7 @@ class TestLocalEnvStore:
 
     def test_list_keys(self, tmp_path):
         from envault.stores import LocalEnvStore
+
         env_file = tmp_path / ".env"
         env_file.write_text("A=1\nB=2\n")
         store = LocalEnvStore(str(env_file))
@@ -533,6 +580,7 @@ class TestLocalEnvStore:
 
     def test_get_many(self, tmp_path):
         from envault.stores import LocalEnvStore
+
         env_file = tmp_path / ".env"
         env_file.write_text("A=1\nB=2\nC=3\n")
         store = LocalEnvStore(str(env_file))
@@ -541,6 +589,7 @@ class TestLocalEnvStore:
 
     def test_set_many(self, tmp_path):
         from envault.stores import LocalEnvStore
+
         env_file = tmp_path / ".env"
         env_file.write_text("A=1\n")
         store = LocalEnvStore(str(env_file))
@@ -552,6 +601,7 @@ class TestLocalEnvStore:
 
 def test_store_factory_default():
     from envault.stores import LocalEnvStore, get_store
+
     store = get_store("some_path")
     assert isinstance(store, LocalEnvStore)
 
@@ -559,6 +609,7 @@ def test_store_factory_default():
 def test_store_factory_local_config(tmp_path):
     from envault.config import SecretStoreConfig
     from envault.stores import LocalEnvStore, get_store
+
     config = SecretStoreConfig(type="local", path_prefix=str(tmp_path / ".env"))
     store = get_store(config)
     assert isinstance(store, LocalEnvStore)
@@ -567,6 +618,7 @@ def test_store_factory_local_config(tmp_path):
 def test_store_factory_unknown():
     from envault.config import SecretStoreConfig
     from envault.stores import SecretStoreError, get_store
+
     config = SecretStoreConfig(type="nonexistent")
     with pytest.raises(SecretStoreError):
         get_store(config)
@@ -575,6 +627,7 @@ def test_store_factory_unknown():
 def test_local_store_list_keys_with_prefix(tmp_path):
     """LocalEnvStore.list_keys filters by prefix."""
     from envault.stores import LocalEnvStore
+
     env_file = tmp_path / ".env"
     env_file.write_text("DB_HOST=localhost\nDB_PORT=5432\nAPI_KEY=abc\n")
     store = LocalEnvStore(str(env_file))
@@ -605,23 +658,31 @@ def test_cli_store_delete_ok(tmp_path):
                 "type": "local",
                 "path_prefix": str(env_file),
             }
-        }
+        },
     }
     config_path = tmp_path / ".envault.yml"
     with open(config_path, "w") as f:
         yaml.dump(envault_config, f)
 
     runner = CliRunner()
-    result = runner.invoke(app, [
-        "store", "delete", "MY_KEY",
-        "--store", "local",
-        "-c", str(config_path),
-    ])
+    result = runner.invoke(
+        app,
+        [
+            "store",
+            "delete",
+            "MY_KEY",
+            "--store",
+            "local",
+            "-c",
+            str(config_path),
+        ],
+    )
     assert result.exit_code == 0, f"stdout: {result.stdout}"
     assert "Deleted" in result.stdout
 
     # Verify key was actually deleted
     from envault.stores import LocalEnvStore
+
     store = LocalEnvStore(str(env_file))
     assert store.get("MY_KEY") is None
     assert store.get("OTHER") == "keep"
@@ -644,18 +705,25 @@ def test_cli_store_delete_not_found(tmp_path):
                 "type": "local",
                 "path_prefix": str(env_file),
             }
-        }
+        },
     }
     config_path = tmp_path / ".envault.yml"
     with open(config_path, "w") as f:
         yaml.dump(envault_config, f)
 
     runner = CliRunner()
-    result = runner.invoke(app, [
-        "store", "delete", "NONEXISTENT",
-        "--store", "local",
-        "-c", str(config_path),
-    ])
+    result = runner.invoke(
+        app,
+        [
+            "store",
+            "delete",
+            "NONEXISTENT",
+            "--store",
+            "local",
+            "-c",
+            str(config_path),
+        ],
+    )
     assert result.exit_code == 1
     assert "not found" in result.output.lower() or "Error" in result.output
 
@@ -681,7 +749,9 @@ def test_encrypt_roundtrip(tmp_path):
     assert env_file.exists()  # original not deleted
 
     # Decrypt
-    decrypted = decrypt_env(encrypted, output_path=tmp_path / ".env.restored", password=password)
+    decrypted = decrypt_env(
+        encrypted, output_path=tmp_path / ".env.restored", password=password
+    )
     assert decrypted.exists()
     assert decrypted.read_text() == "SECRET=my_value\nAPI_KEY=abc123\n"
 
@@ -777,7 +847,9 @@ def test_cli_diff_identical(tmp_path):
     env_b.write_text("KEY=value\n")
 
     runner = CliRunner()
-    result = runner.invoke(app, ["diff", "--source", str(env_a), "--target", str(env_b)])
+    result = runner.invoke(
+        app, ["diff", "--source", str(env_a), "--target", str(env_b)]
+    )
     assert result.exit_code == 0
     assert "identical" in result.stdout.lower()
 
@@ -794,7 +866,9 @@ def test_cli_diff_different(tmp_path):
     env_b.write_text("KEY=new\n")
 
     runner = CliRunner()
-    result = runner.invoke(app, ["diff", "--source", str(env_a), "--target", str(env_b)])
+    result = runner.invoke(
+        app, ["diff", "--source", str(env_a), "--target", str(env_b)]
+    )
     assert result.exit_code == 0
 
 
