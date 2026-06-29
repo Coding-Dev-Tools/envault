@@ -59,6 +59,7 @@ def test_init_defaults(runner: CliRunner, tmp_path):
 
     # Verify the file is valid YAML
     import yaml
+
     with open(config_path) as f:
         data = yaml.safe_load(f)
     assert data is not None
@@ -73,6 +74,7 @@ def test_init_existing_raises(runner: CliRunner, tmp_path):
     assert result.exit_code == 0
     # Should be re-created, or let's check the behavior
     import yaml
+
     with open(config_path) as f:
         data = yaml.safe_load(f)
     # After re-init, project should be updated
@@ -89,12 +91,16 @@ def _make_config(tmp_path, project="test", env_files=None):
     Paths can be relative (resolved against tmp_path) or absolute.
     """
     import yaml
-    env_files = env_files or {"dev": "env.dev", "staging": "env.staging", "prod": "env.prod"}
+
+    env_files = env_files or {
+        "dev": "env.dev",
+        "staging": "env.staging",
+        "prod": "env.prod",
+    }
     config = {
         "project": project,
         "environments": [
-            {"name": name, "env_file": path}
-            for name, path in env_files.items()
+            {"name": name, "env_file": path} for name, path in env_files.items()
         ],
     }
     config_path = tmp_path / ".envault.yml"
@@ -117,16 +123,23 @@ def test_diff_with_config(runner: CliRunner, tmp_path):
     src.write_text("KEY=source_value\nSHARED=yes\n")
     tgt.write_text("KEY=target_value\nSHARED=yes\n")
 
-    result = runner.invoke(app, [
-        "diff", "dev", "prod",
-        "--source", str(src),
-        "--target", str(tgt),
-        "--config", config_path,
-    ])
+    result = runner.invoke(
+        app,
+        [
+            "diff",
+            "dev",
+            "prod",
+            "--source",
+            str(src),
+            "--target",
+            str(tgt),
+            "--config",
+            config_path,
+        ],
+    )
     assert result.exit_code == 0
     assert "KEY" in result.stdout
     assert "difference" in result.stdout.lower() or "Differing" in result.stdout
-
 
 
 def test_diff_files_identical(runner: CliRunner, tmp_path):
@@ -138,7 +151,11 @@ def test_diff_files_identical(runner: CliRunner, tmp_path):
 
     result = runner.invoke(app, ["diff-files", str(file1), str(file2)])
     assert result.exit_code == 0
-    assert "identical" in result.stdout.lower() or "identical" in result.stdout or "no difference" in result.stdout.lower()
+    assert (
+        "identical" in result.stdout.lower()
+        or "identical" in result.stdout
+        or "no difference" in result.stdout.lower()
+    )
 
 
 def test_diff_files_different(runner: CliRunner, tmp_path):
@@ -156,9 +173,14 @@ def test_diff_files_different(runner: CliRunner, tmp_path):
 
 def test_diff_files_not_found(runner: CliRunner, tmp_path):
     """diff-files on non-existent files should error with a clear message."""
-    result = runner.invoke(app, ["diff-files", str(tmp_path / "nope1.env"), str(tmp_path / "nope2.env")])
+    result = runner.invoke(
+        app, ["diff-files", str(tmp_path / "nope1.env"), str(tmp_path / "nope2.env")]
+    )
     assert result.exit_code == 1
-    assert "not found" in " ".join(result.output.lower().split()) or "error" in result.output.lower()
+    assert (
+        "not found" in " ".join(result.output.lower().split())
+        or "error" in result.output.lower()
+    )
 
 
 def test_diff_files_json_output_with_only_keys(runner: CliRunner, tmp_path):
@@ -206,13 +228,21 @@ def test_diff_with_config_json_key_labels(runner: CliRunner, tmp_path):
     src.write_text("KEY=source_value\nSHARED=yes\n")
     tgt.write_text("KEY=target_value\nSHARED=yes\n")
 
-    result = runner.invoke(app, [
-        "diff", "dev", "prod",
-        "--source", str(src),
-        "--target", str(tgt),
-        "--config", config_path,
-        "--json",
-    ])
+    result = runner.invoke(
+        app,
+        [
+            "diff",
+            "dev",
+            "prod",
+            "--source",
+            str(src),
+            "--target",
+            str(tgt),
+            "--config",
+            config_path,
+            "--json",
+        ],
+    )
     assert result.exit_code == 0
     parsed = _json.loads(result.stdout)
     assert parsed["has_differences"] is True
@@ -225,6 +255,7 @@ def test_diff_with_config_json_key_labels(runner: CliRunner, tmp_path):
 def test_diff_files_json_output(runner: CliRunner, tmp_path):
     """diff-files --json should produce valid JSON with diff categories."""
     import json as _json
+
     file1 = tmp_path / "a.env"
     file2 = tmp_path / "b.env"
     file1.write_text("KEY=value\nFOO=bar\nONLY_SRC=yes\n")
@@ -243,6 +274,7 @@ def test_diff_files_json_output(runner: CliRunner, tmp_path):
 def test_diff_files_json_identical(runner: CliRunner, tmp_path):
     """diff-files --json with identical files should show no differences."""
     import json as _json
+
     file1 = tmp_path / "a.env"
     file2 = tmp_path / "b.env"
     file1.write_text("KEY=value\n")
@@ -258,19 +290,28 @@ def test_diff_files_json_identical(runner: CliRunner, tmp_path):
 def test_diff_with_config_json(runner: CliRunner, tmp_path):
     """diff --json with config and explicit file overrides should output JSON."""
     import json as _json
+
     config_path = _make_config(tmp_path)
     src = tmp_path / "src.env"
     tgt = tmp_path / "tgt.env"
     src.write_text("KEY=source_value\nSHARED=yes\n")
     tgt.write_text("KEY=target_value\nSHARED=yes\n")
 
-    result = runner.invoke(app, [
-        "diff", "dev", "prod",
-        "--source", str(src),
-        "--target", str(tgt),
-        "--config", config_path,
-        "--json",
-    ])
+    result = runner.invoke(
+        app,
+        [
+            "diff",
+            "dev",
+            "prod",
+            "--source",
+            str(src),
+            "--target",
+            str(tgt),
+            "--config",
+            config_path,
+            "--json",
+        ],
+    )
     assert result.exit_code == 0
     parsed = _json.loads(result.stdout)
     assert parsed["has_differences"] is True
@@ -302,7 +343,9 @@ def test_encrypt_cli_custom_output(runner: CliRunner, tmp_path):
     env_file.write_text("KEY=val\n")
     output = tmp_path / "custom.enc"
 
-    result = runner.invoke(app, ["encrypt", str(env_file), "--output", str(output), "--password", "p"])
+    result = runner.invoke(
+        app, ["encrypt", str(env_file), "--output", str(output), "--password", "p"]
+    )
     assert result.exit_code == 0
     assert output.exists()
     assert output.read_bytes().startswith(b"gAAAA")
@@ -313,7 +356,9 @@ def test_encrypt_cli_delete_original(runner: CliRunner, tmp_path):
     env_file = tmp_path / ".env"
     env_file.write_text("KEY=val\n")
 
-    result = runner.invoke(app, ["encrypt", str(env_file), "--password", "p", "--delete"])
+    result = runner.invoke(
+        app, ["encrypt", str(env_file), "--password", "p", "--delete"]
+    )
     assert result.exit_code == 0
     assert not env_file.exists()
 
@@ -324,7 +369,11 @@ def test_encrypt_empty_fails(runner: CliRunner, tmp_path):
     env_file.write_text("")
 
     result = runner.invoke(app, ["encrypt", str(env_file), "--password", "p"])
-    assert result.exit_code != 0 or "empty" in result.stdout.lower() or "error" in result.stdout.lower()
+    assert (
+        result.exit_code != 0
+        or "empty" in result.stdout.lower()
+        or "error" in result.stdout.lower()
+    )
 
 
 def test_decrypt_cli_roundtrip(runner: CliRunner, tmp_path):
@@ -334,13 +383,33 @@ def test_decrypt_cli_roundtrip(runner: CliRunner, tmp_path):
     encrypted = tmp_path / ".env.test.locked"
 
     # Encrypt
-    result_enc = runner.invoke(app, ["encrypt", str(env_file), "--output", str(encrypted), "--password", "roundtrip"])
+    result_enc = runner.invoke(
+        app,
+        [
+            "encrypt",
+            str(env_file),
+            "--output",
+            str(encrypted),
+            "--password",
+            "roundtrip",
+        ],
+    )
     assert result_enc.exit_code == 0
     assert encrypted.exists()
 
     # Decrypt
     decrypted = tmp_path / ".env.restored"
-    result_dec = runner.invoke(app, ["decrypt", str(encrypted), "--output", str(decrypted), "--password", "roundtrip"])
+    result_dec = runner.invoke(
+        app,
+        [
+            "decrypt",
+            str(encrypted),
+            "--output",
+            str(decrypted),
+            "--password",
+            "roundtrip",
+        ],
+    )
     assert result_dec.exit_code == 0
     assert "Decrypted" in result_dec.stdout
     assert decrypted.exists()
@@ -353,9 +422,26 @@ def test_decrypt_wrong_password_fails(runner: CliRunner, tmp_path):
     env_file.write_text("KEY=val\n")
     encrypted = tmp_path / ".env.locked"
 
-    runner.invoke(app, ["encrypt", str(env_file), "--output", str(encrypted), "--password", "correct"])
-    result = runner.invoke(app, ["decrypt", str(encrypted), "--output", str(tmp_path / "out"), "--password", "wrong"])
-    assert result.exit_code != 0 or "failed" in result.stdout.lower() or "error" in result.stdout.lower()
+    runner.invoke(
+        app,
+        ["encrypt", str(env_file), "--output", str(encrypted), "--password", "correct"],
+    )
+    result = runner.invoke(
+        app,
+        [
+            "decrypt",
+            str(encrypted),
+            "--output",
+            str(tmp_path / "out"),
+            "--password",
+            "wrong",
+        ],
+    )
+    assert (
+        result.exit_code != 0
+        or "failed" in result.stdout.lower()
+        or "error" in result.stdout.lower()
+    )
 
 
 # ── Sync (dry-run) ──────────────────────────────────────────────────────────
@@ -370,15 +456,26 @@ def test_sync_dry_run(runner: CliRunner, tmp_path):
     src.write_text("KEY=source_val\nNEW_KEY=hello\n")
     tgt.write_text("KEY=old_val\n")
 
-    result = runner.invoke(app, [
-        "sync", "dev", "prod",
-        "--strategy", "source_wins",
-        "--dry-run",
-        "--config", config_path,
-    ])
+    result = runner.invoke(
+        app,
+        [
+            "sync",
+            "dev",
+            "prod",
+            "--strategy",
+            "source_wins",
+            "--dry-run",
+            "--config",
+            config_path,
+        ],
+    )
     assert result.exit_code == 0
     assert "Dry run" in result.stdout or "dry" in result.stdout.lower()
-    assert "KEY" in result.stdout or "keys to update" in result.stdout or "keys to add" in result.stdout
+    assert (
+        "KEY" in result.stdout
+        or "keys to update" in result.stdout
+        or "keys to add" in result.stdout
+    )
 
 
 def test_sync_source_not_found(runner: CliRunner, tmp_path):
@@ -389,11 +486,17 @@ def test_sync_source_not_found(runner: CliRunner, tmp_path):
     # Don't create the source file
     tgt.write_text("KEY=value\n")
 
-    result = runner.invoke(app, [
-        "sync", "dev", "prod",
-        "--dry-run",
-        "--config", config_path,
-    ])
+    result = runner.invoke(
+        app,
+        [
+            "sync",
+            "dev",
+            "prod",
+            "--dry-run",
+            "--config",
+            config_path,
+        ],
+    )
     assert result.exit_code != 0
     assert "not found" in result.output.lower() or "Error" in result.output
 
@@ -407,7 +510,11 @@ def test_unknown_command_shows_help(runner: CliRunner):
     # CliRunner prints help/error to stderr for unknown commands
     assert result.exit_code != 0
     # Check combined output (stdout + stderr)
-    assert "Error" in result.output or "No such" in result.output or "Usage" in result.output
+    assert (
+        "Error" in result.output
+        or "No such" in result.output
+        or "Usage" in result.output
+    )
 
 
 def test_init_missing_project_name(runner: CliRunner):
@@ -435,11 +542,17 @@ def test_init_generates_env_example(runner: CliRunner, tmp_path):
         yaml.dump(config, f)
 
     # Re-init to generate example from existing config + env files
-    result = runner.invoke(app, [
-        "init", "my-project",
-        "--config", str(config_path),
-        "--example-file", str(example_path),
-    ])
+    result = runner.invoke(
+        app,
+        [
+            "init",
+            "my-project",
+            "--config",
+            str(config_path),
+            "--example-file",
+            str(example_path),
+        ],
+    )
     assert result.exit_code == 0
     assert example_path.exists()
 
@@ -459,11 +572,16 @@ def test_init_no_example_flag(runner: CliRunner, tmp_path):
     config_path = tmp_path / ".envault.yml"
     example_path = tmp_path / ".env.example"
 
-    result = runner.invoke(app, [
-        "init", "my-project",
-        "--config", str(config_path),
-        "--no-example",
-    ])
+    result = runner.invoke(
+        app,
+        [
+            "init",
+            "my-project",
+            "--config",
+            str(config_path),
+            "--no-example",
+        ],
+    )
     assert result.exit_code == 0
     assert config_path.exists()
     assert not example_path.exists()
@@ -482,11 +600,17 @@ def test_init_example_from_env_file(runner: CliRunner, tmp_path):
     old_cwd = os.getcwd()
     try:
         os.chdir(tmp_path)
-        result = runner.invoke(app, [
-            "init", "my-project",
-            "--config", str(config_path),
-            "--example-file", str(example_path),
-        ])
+        result = runner.invoke(
+            app,
+            [
+                "init",
+                "my-project",
+                "--config",
+                str(config_path),
+                "--example-file",
+                str(example_path),
+            ],
+        )
     finally:
         os.chdir(old_cwd)
 
@@ -512,14 +636,24 @@ def test_init_example_sorted_keys(runner: CliRunner, tmp_path):
     with open(config_path, "w") as f:
         yaml.dump(config, f)
 
-    result = runner.invoke(app, [
-        "init", "my-project",
-        "--config", str(config_path),
-        "--example-file", str(example_path),
-    ])
+    result = runner.invoke(
+        app,
+        [
+            "init",
+            "my-project",
+            "--config",
+            str(config_path),
+            "--example-file",
+            str(example_path),
+        ],
+    )
     assert result.exit_code == 0
 
-    lines = [line for line in example_path.read_text().splitlines() if line and not line.startswith("#")]
+    lines = [
+        line
+        for line in example_path.read_text().splitlines()
+        if line and not line.startswith("#")
+    ]
     keys = [line.split("=")[0] for line in lines]
     assert keys == sorted(keys)
 
@@ -529,11 +663,17 @@ def test_init_example_no_env_files(runner: CliRunner, tmp_path):
     config_path = tmp_path / ".envault.yml"
     example_path = tmp_path / ".env.example"
 
-    result = runner.invoke(app, [
-        "init", "my-project",
-        "--config", str(config_path),
-        "--example-file", str(example_path),
-    ])
+    result = runner.invoke(
+        app,
+        [
+            "init",
+            "my-project",
+            "--config",
+            str(config_path),
+            "--example-file",
+            str(example_path),
+        ],
+    )
     assert result.exit_code == 0
     # The example file may or may not exist depending on whether .env files were found
     # Key thing: no crash and config was created
@@ -551,11 +691,18 @@ def test_sync_actual_execution(runner: CliRunner, tmp_path):
     src.write_text("KEY=source_val\nSHARED=yes\n")
     tgt.write_text("SHARED=yes\nLOCAL=keep\n")
 
-    result = runner.invoke(app, [
-        "sync", "dev", "prod",
-        "--strategy", "source_wins",
-        "--config", config_path,
-    ])
+    result = runner.invoke(
+        app,
+        [
+            "sync",
+            "dev",
+            "prod",
+            "--strategy",
+            "source_wins",
+            "--config",
+            config_path,
+        ],
+    )
     assert result.exit_code == 0
     assert "Synced" in result.stdout
     assert "Added" in result.stdout
@@ -575,12 +722,19 @@ def test_sync_actual_execution_allow_delete(runner: CliRunner, tmp_path):
     src.write_text("KEY=source_val\n")
     tgt.write_text("KEY=old_val\nOLDKEY=remove_me\n")
 
-    result = runner.invoke(app, [
-        "sync", "dev", "prod",
-        "--strategy", "source_wins",
-        "--allow-delete",
-        "--config", config_path,
-    ])
+    result = runner.invoke(
+        app,
+        [
+            "sync",
+            "dev",
+            "prod",
+            "--strategy",
+            "source_wins",
+            "--allow-delete",
+            "--config",
+            config_path,
+        ],
+    )
     assert result.exit_code == 0
 
     # Verify old key was removed
@@ -597,11 +751,18 @@ def test_sync_already_in_sync(runner: CliRunner, tmp_path):
     src.write_text("KEY=value\n")
     tgt.write_text("KEY=value\n")
 
-    result = runner.invoke(app, [
-        "sync", "dev", "prod",
-        "--strategy", "source_wins",
-        "--config", config_path,
-    ])
+    result = runner.invoke(
+        app,
+        [
+            "sync",
+            "dev",
+            "prod",
+            "--strategy",
+            "source_wins",
+            "--config",
+            config_path,
+        ],
+    )
     assert result.exit_code == 0
     assert "already in sync" in result.stdout.lower()
 
@@ -609,16 +770,17 @@ def test_sync_already_in_sync(runner: CliRunner, tmp_path):
 # ── Rotate All ────────────────────────────────────────────────────────────────
 
 
-def _make_config_with_env(tmp_path, project="test", env_name="dev", env_content="KEY=value\nFOO=bar\n"):
+def _make_config_with_env(
+    tmp_path, project="test", env_name="dev", env_content="KEY=value\nFOO=bar\n"
+):
     """Create a minimal .envault.yml and a matching .env file."""
     import yaml
+
     env_file = tmp_path / f".env.{env_name}"
     env_file.write_text(env_content)
     config = {
         "project": project,
-        "environments": [
-            {"name": env_name, "env_file": str(env_file)}
-        ],
+        "environments": [{"name": env_name, "env_file": str(env_file)}],
         "audit_log_path": str(tmp_path / ".envault-audit.log"),
     }
     config_path = tmp_path / ".envault.yml"
@@ -628,22 +790,31 @@ def _make_config_with_env(tmp_path, project="test", env_name="dev", env_content=
 
 
 def test_rotate_all_dry_run(runner: CliRunner, tmp_path):
-    config_path = _make_config_with_env(tmp_path, env_content="DB_PASSWORD=secret\nAPI_KEY=abc\n")
-    result = runner.invoke(app, ["rotate-all", "--env", "dev", "--dry-run", "--config", config_path])
+    config_path = _make_config_with_env(
+        tmp_path, env_content="DB_PASSWORD=secret\nAPI_KEY=abc\n"
+    )
+    result = runner.invoke(
+        app, ["rotate-all", "--env", "dev", "--dry-run", "--config", config_path]
+    )
     assert result.exit_code == 0
     assert "Dry run" in result.stdout or "Would rotate" in result.stdout
 
 
 def test_rotate_all_no_variables(runner: CliRunner, tmp_path):
     config_path = _make_config_with_env(tmp_path, env_content="")
-    result = runner.invoke(app, ["rotate-all", "--env", "dev", "--dry-run", "--config", config_path])
+    result = runner.invoke(
+        app, ["rotate-all", "--env", "dev", "--dry-run", "--config", config_path]
+    )
     assert result.exit_code == 0
     assert "No variables" in result.stdout
 
 
 def test_rotate_all_env_not_found(runner: CliRunner, tmp_path):
     config_path = _make_config_with_env(tmp_path)
-    result = runner.invoke(app, ["rotate-all", "--env", "nonexistent", "--dry-run", "--config", config_path])
+    result = runner.invoke(
+        app,
+        ["rotate-all", "--env", "nonexistent", "--dry-run", "--config", config_path],
+    )
     assert result.exit_code != 0
     assert "not found" in result.output.lower()
 
@@ -654,6 +825,7 @@ def test_rotate_all_env_not_found(runner: CliRunner, tmp_path):
 def _make_store_config(tmp_path, env_content="KEY=val\nOTHER=keep\n"):
     """Create .envault.yml with a local store."""
     import yaml
+
     env_file = tmp_path / ".env"
     env_file.write_text(env_content)
     config = {
@@ -672,8 +844,12 @@ def _make_store_config(tmp_path, env_content="KEY=val\nOTHER=keep\n"):
 
 
 def test_store_list_prefix(runner: CliRunner, tmp_path):
-    config_path, _ = _make_store_config(tmp_path, env_content="DB_HOST=localhost\nDB_PORT=5432\nAPI_KEY=abc\n")
-    result = runner.invoke(app, ["store", "list", "local", "--prefix", "DB_", "--config", config_path])
+    config_path, _ = _make_store_config(
+        tmp_path, env_content="DB_HOST=localhost\nDB_PORT=5432\nAPI_KEY=abc\n"
+    )
+    result = runner.invoke(
+        app, ["store", "list", "local", "--prefix", "DB_", "--config", config_path]
+    )
     assert result.exit_code == 0
     assert "DB_HOST" in result.stdout
     assert "API_KEY" not in result.stdout
@@ -681,17 +857,34 @@ def test_store_list_prefix(runner: CliRunner, tmp_path):
 
 def test_store_get_not_found(runner: CliRunner, tmp_path):
     config_path, _ = _make_store_config(tmp_path)
-    result = runner.invoke(app, ["store", "get", "NONEXISTENT", "--store", "local", "--config", config_path])
+    result = runner.invoke(
+        app,
+        ["store", "get", "NONEXISTENT", "--store", "local", "--config", config_path],
+    )
     assert result.exit_code == 1
     assert "not found" in result.output.lower()
 
 
 def test_store_set_and_get(runner: CliRunner, tmp_path):
     config_path, _ = _make_store_config(tmp_path)
-    set_result = runner.invoke(app, ["store", "set", "NEW_KEY", "new_value", "--store", "local", "--config", config_path])
+    set_result = runner.invoke(
+        app,
+        [
+            "store",
+            "set",
+            "NEW_KEY",
+            "new_value",
+            "--store",
+            "local",
+            "--config",
+            config_path,
+        ],
+    )
     assert set_result.exit_code == 0
     assert "Set" in set_result.stdout
-    get_result = runner.invoke(app, ["store", "get", "NEW_KEY", "--store", "local", "--config", config_path])
+    get_result = runner.invoke(
+        app, ["store", "get", "NEW_KEY", "--store", "local", "--config", config_path]
+    )
     assert get_result.exit_code == 0
     assert "new_value" in get_result.stdout
 
@@ -702,6 +895,7 @@ def test_store_set_and_get(runner: CliRunner, tmp_path):
 def _make_audit_config(tmp_path):
     """Create config with an audit log file."""
     import yaml
+
     config = {
         "project": "test",
         "environments": [],
@@ -722,10 +916,13 @@ def test_audit_cli_no_entries(runner: CliRunner, tmp_path):
 
 def test_audit_cli_with_entries(runner: CliRunner, tmp_path):
     from envault.audit import AuditLogger
+
     config_path = _make_audit_config(tmp_path)
     log_path = str(tmp_path / ".envault-audit.log")
     AuditLogger(log_path).log("rotate", "DB_PASSWORD", env_file=".env.prod")
-    AuditLogger(log_path).log("add", "API_KEY", source_path=".env.dev", target_path=".env.prod")
+    AuditLogger(log_path).log(
+        "add", "API_KEY", source_path=".env.dev", target_path=".env.prod"
+    )
     result = runner.invoke(app, ["audit", "--config", config_path])
     assert result.exit_code == 0
     assert "DB_PASSWORD" in result.stdout
@@ -734,11 +931,14 @@ def test_audit_cli_with_entries(runner: CliRunner, tmp_path):
 
 def test_audit_cli_filter_key(runner: CliRunner, tmp_path):
     from envault.audit import AuditLogger
+
     config_path = _make_audit_config(tmp_path)
     log_path = str(tmp_path / ".envault-audit.log")
     AuditLogger(log_path).log("rotate", "DB_PASSWORD", env_file=".env.prod")
     AuditLogger(log_path).log("set", "API_KEY", env_file=".env.prod")
-    result = runner.invoke(app, ["audit", "--key", "DB_PASSWORD", "--config", config_path])
+    result = runner.invoke(
+        app, ["audit", "--key", "DB_PASSWORD", "--config", config_path]
+    )
     assert result.exit_code == 0
     assert "API_KEY" not in result.stdout
 
@@ -749,6 +949,7 @@ def test_audit_cli_filter_key(runner: CliRunner, tmp_path):
 def test_rotate_dry_run(runner: CliRunner, tmp_path):
     """rotate a single key with --dry-run should show new value without modifying."""
     import yaml
+
     env_file = tmp_path / ".env.dev"
     env_file.write_text("DB_PASSWORD=old_secret\nAPI_KEY=keep_this\n")
     config = {
@@ -760,14 +961,21 @@ def test_rotate_dry_run(runner: CliRunner, tmp_path):
     with open(config_path, "w") as f:
         yaml.dump(config, f)
 
-    result = runner.invoke(app, [
-        "rotate", "DB_PASSWORD",
-        "--env", "dev",
-        "--length", "16",
-        "--dry-run",
-        "--show",
-        "--config", str(config_path),
-    ])
+    result = runner.invoke(
+        app,
+        [
+            "rotate",
+            "DB_PASSWORD",
+            "--env",
+            "dev",
+            "--length",
+            "16",
+            "--dry-run",
+            "--show",
+            "--config",
+            str(config_path),
+        ],
+    )
     assert result.exit_code == 0
     assert "Would rotate" in result.stdout or "Dry run" in result.stdout
     assert "DB_PASSWORD" in result.stdout
@@ -780,6 +988,7 @@ def test_rotate_dry_run(runner: CliRunner, tmp_path):
 def test_rotate_key_not_found(runner: CliRunner, tmp_path):
     """rotate on a non-existent key should exit with error."""
     import yaml
+
     env_file = tmp_path / ".env.dev"
     env_file.write_text("EXISTING_KEY=value\n")
     config = {
@@ -791,12 +1000,18 @@ def test_rotate_key_not_found(runner: CliRunner, tmp_path):
     with open(config_path, "w") as f:
         yaml.dump(config, f)
 
-    result = runner.invoke(app, [
-        "rotate", "NONEXISTENT_KEY",
-        "--env", "dev",
-        "--dry-run",
-        "--config", str(config_path),
-    ])
+    result = runner.invoke(
+        app,
+        [
+            "rotate",
+            "NONEXISTENT_KEY",
+            "--env",
+            "dev",
+            "--dry-run",
+            "--config",
+            str(config_path),
+        ],
+    )
     assert result.exit_code != 0
     assert "not found" in result.output.lower()
 
@@ -807,16 +1022,22 @@ def test_rotate_cli_actual(runner: CliRunner, tmp_path):
     config_path = _make_config(tmp_path, env_files={"dev": str(env_file)})
     env_file.write_text("DB_PASSWORD=old_password\nKEY=value\n")
 
-    result = runner.invoke(app, [
-        "rotate", "DB_PASSWORD",
-        "--env", "dev",
-        "--config", config_path,
-    ])
+    result = runner.invoke(
+        app,
+        [
+            "rotate",
+            "DB_PASSWORD",
+            "--env",
+            "dev",
+            "--config",
+            config_path,
+        ],
+    )
     assert result.exit_code == 0
     assert "Rotated" in result.stdout
     content = env_file.read_text()
     assert "old_password" not in content
-    assert "KEY=value" in content # other keys untouched
+    assert "KEY=value" in content  # other keys untouched
 
 
 # ── History CLI ────────────────────────────────────────────────────────────────
@@ -827,6 +1048,7 @@ def test_history_no_git(tmp_path, runner: CliRunner):
     env_file = tmp_path / ".env.dev"
     env_file.write_text("KEY=value\n")
     import yaml
+
     config = {
         "project": "test",
         "environments": [{"name": "dev", "env_file": str(env_file)}],
@@ -843,9 +1065,12 @@ def test_history_no_git(tmp_path, runner: CliRunner):
 def test_history_file_not_found(tmp_path, runner: CliRunner):
     """history on a non-existent file should exit with error."""
     import yaml
+
     config = {
         "project": "test",
-        "environments": [{"name": "dev", "env_file": str(tmp_path / "nonexistent.env")}],
+        "environments": [
+            {"name": "dev", "env_file": str(tmp_path / "nonexistent.env")}
+        ],
     }
     config_path = tmp_path / ".envault.yml"
     with open(config_path, "w") as f:
@@ -870,9 +1095,11 @@ def test_history_direct_file(tmp_path, runner: CliRunner):
 def test_history_json_output(tmp_path, runner: CliRunner):
     """history --json should produce valid JSON output."""
     import json as _json
+
     env_file = tmp_path / ".env.dev"
     env_file.write_text("KEY=value\n")
     import yaml
+
     config = {
         "project": "test",
         "environments": [{"name": "dev", "env_file": str(env_file)}],
@@ -881,10 +1108,14 @@ def test_history_json_output(tmp_path, runner: CliRunner):
     with open(config_path, "w") as f:
         yaml.dump(config, f)
 
-    result = runner.invoke(app, ["history", "dev", "--json", "--config", str(config_path)])
+    result = runner.invoke(
+        app, ["history", "dev", "--json", "--config", str(config_path)]
+    )
     assert result.exit_code == 0
     # Strip \r from Windows line endings before JSON parsing
-    parsed = _json.loads(result.stdout.replace("\r\n", "\n").replace("\r", ""), strict=False)
+    parsed = _json.loads(
+        result.stdout.replace("\r\n", "\n").replace("\r", ""), strict=False
+    )
     assert "file" in parsed
     assert "total_changes" in parsed
     assert "changes" in parsed
@@ -895,7 +1126,9 @@ def test_history_key_filter(tmp_path, runner: CliRunner):
     env_file = tmp_path / ".env.dev"
     env_file.write_text("KEY=value\nOTHER=thing\n")
 
-    result = runner.invoke(app, ["history", "dev", "--file", str(env_file), "--key", "KEY"])
+    result = runner.invoke(
+        app, ["history", "dev", "--file", str(env_file), "--key", "KEY"]
+    )
     assert result.exit_code == 0
 
 
@@ -918,7 +1151,9 @@ def test_backup_create_file_not_found(tmp_path, runner: CliRunner, monkeypatch):
     """backup create --file on non-existent file should error."""
     monkeypatch.chdir(tmp_path)
 
-    result = runner.invoke(app, ["backup", "create", "--file", str(tmp_path / "nonexistent.env")])
+    result = runner.invoke(
+        app, ["backup", "create", "--file", str(tmp_path / "nonexistent.env")]
+    )
     assert result.exit_code != 0
     assert "not found" in result.output.lower() or "error" in result.output.lower()
 
@@ -930,7 +1165,9 @@ def test_backup_create_encrypted(tmp_path, runner: CliRunner, monkeypatch):
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("ENVAULT_ENCRYPT_KEY", "test-password-123")
 
-    result = runner.invoke(app, ["backup", "create", "--file", str(env_file), "--encrypt"])
+    result = runner.invoke(
+        app, ["backup", "create", "--file", str(env_file), "--encrypt"]
+    )
     assert result.exit_code == 0
     assert "encrypted" in result.stdout.lower() or "Backed up" in result.stdout
 
@@ -974,6 +1211,7 @@ def test_backup_restore(tmp_path, runner: CliRunner, monkeypatch):
 
     # Create a backup
     from envault.backup import list_backups
+
     create_result = runner.invoke(app, ["backup", "create", "--file", str(env_file)])
     assert create_result.exit_code == 0
 
@@ -1007,13 +1245,16 @@ def test_backup_restore_not_found(tmp_path, runner: CliRunner, monkeypatch):
 def test_backup_json_output(tmp_path, runner: CliRunner, monkeypatch):
     """backup create --json should produce valid JSON."""
     import json as _json
+
     env_file = tmp_path / ".env.dev"
     env_file.write_text("KEY=value\n")
     monkeypatch.chdir(tmp_path)
 
     result = runner.invoke(app, ["backup", "create", "--file", str(env_file), "--json"])
     assert result.exit_code == 0
-    parsed = _json.loads(result.stdout.replace("\r\n", "\n").replace("\r", ""), strict=False)
+    parsed = _json.loads(
+        result.stdout.replace("\r\n", "\n").replace("\r", ""), strict=False
+    )
     assert "success_count" in parsed
     assert parsed["success_count"] == 1
 
@@ -1025,7 +1266,9 @@ def test_scan_clean_file(tmp_path, runner: CliRunner):
     """scan on a clean file should report PASS and exit 0."""
     env_file = tmp_path / ".env.prod"
     env_file.write_text("DB_HOST=prod.example.com\nDB_PORT=5432\n")
-    result = runner.invoke(app, ["scan", str(env_file), "--no-permissions", "--no-gitignore"])
+    result = runner.invoke(
+        app, ["scan", str(env_file), "--no-permissions", "--no-gitignore"]
+    )
     assert result.exit_code == 0
     assert "PASS" in result.output
 
@@ -1034,7 +1277,9 @@ def test_scan_weak_password(tmp_path, runner: CliRunner):
     """scan should flag weak password."""
     env_file = tmp_path / ".env"
     env_file.write_text("DB_PASSWORD=password\n")
-    result = runner.invoke(app, ["scan", str(env_file), "--no-permissions", "--no-gitignore"])
+    result = runner.invoke(
+        app, ["scan", str(env_file), "--no-permissions", "--no-gitignore"]
+    )
     assert "weak_secret" in result.output
 
 
@@ -1042,7 +1287,9 @@ def test_scan_hardcoded_credential(tmp_path, runner: CliRunner):
     """scan should flag hardcoded AWS key as critical and exit 1."""
     env_file = tmp_path / ".env"
     env_file.write_text("AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE\n")
-    result = runner.invoke(app, ["scan", str(env_file), "--no-permissions", "--no-gitignore"])
+    result = runner.invoke(
+        app, ["scan", str(env_file), "--no-permissions", "--no-gitignore"]
+    )
     assert result.exit_code == 1
     assert "hardcoded_credential" in result.output
 
@@ -1053,8 +1300,12 @@ def test_scan_json_output(tmp_path, runner: CliRunner):
 
     env_file = tmp_path / ".env"
     env_file.write_text("AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE\n")
-    result = runner.invoke(app, ["scan", str(env_file), "--json", "--no-permissions", "--no-gitignore"])
-    parsed = _json.loads(result.output.replace("\r\n", "\n").replace("\r", ""), strict=False)
+    result = runner.invoke(
+        app, ["scan", str(env_file), "--json", "--no-permissions", "--no-gitignore"]
+    )
+    parsed = _json.loads(
+        result.output.replace("\r\n", "\n").replace("\r", ""), strict=False
+    )
     assert isinstance(parsed, list)
     assert len(parsed) == 1
     entry = parsed[0]
@@ -1071,8 +1322,12 @@ def test_scan_json_clean(tmp_path, runner: CliRunner):
 
     env_file = tmp_path / ".env"
     env_file.write_text("APP_NAME=myapp\nAPP_PORT=8080\n")
-    result = runner.invoke(app, ["scan", str(env_file), "--json", "--no-permissions", "--no-gitignore"])
-    parsed = _json.loads(result.output.replace("\r\n", "\n").replace("\r", ""), strict=False)
+    result = runner.invoke(
+        app, ["scan", str(env_file), "--json", "--no-permissions", "--no-gitignore"]
+    )
+    parsed = _json.loads(
+        result.output.replace("\r\n", "\n").replace("\r", ""), strict=False
+    )
     assert parsed[0]["pass_fail"] == "PASS"
     assert parsed[0]["critical"] == 0
     assert parsed[0]["high"] == 0
@@ -1084,7 +1339,9 @@ def test_scan_multiple_files(tmp_path, runner: CliRunner):
     env1.write_text("AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE\n")
     env2 = tmp_path / ".env.prod"
     env2.write_text("DB_HOST=prod.example.com\n")
-    result = runner.invoke(app, ["scan", str(env1), str(env2), "--no-permissions", "--no-gitignore"])
+    result = runner.invoke(
+        app, ["scan", str(env1), str(env2), "--no-permissions", "--no-gitignore"]
+    )
     assert result.exit_code == 1  # env1 has hardcoded credential
     assert ".env.dev" in result.output
     assert ".env.prod" in result.output
@@ -1092,5 +1349,14 @@ def test_scan_multiple_files(tmp_path, runner: CliRunner):
 
 def test_scan_nonexistent_file(runner: CliRunner):
     """scan on a non-existent file should produce an info-level issue (visible with --verbose)."""
-    result = runner.invoke(app, ["scan", "/tmp/nonexistent_env_file_xyz.env", "--no-permissions", "--no-gitignore", "--verbose"])
+    result = runner.invoke(
+        app,
+        [
+            "scan",
+            "/tmp/nonexistent_env_file_xyz.env",
+            "--no-permissions",
+            "--no-gitignore",
+            "--verbose",
+        ],
+    )
     assert "missing" in result.output or "does not exist" in result.output
