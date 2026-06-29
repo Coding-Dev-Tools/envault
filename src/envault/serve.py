@@ -21,7 +21,7 @@ import json
 import os
 import secrets as _secrets
 import time
-from http.server import HTTPServer, BaseHTTPRequestHandler
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 from typing import Any
 from urllib.error import URLError
@@ -30,7 +30,7 @@ from urllib.request import Request, urlopen
 
 from envault.config import EnvaultConfig
 from envault.encrypt import KEY_ENV_VAR
-from envault.stores import SecretStore, LocalEnvStore, get_store
+from envault.stores import LocalEnvStore, SecretStore, get_store
 
 # Environment variable for API authentication key
 API_KEY_ENV_VAR = "ENVAULT_API_KEY"
