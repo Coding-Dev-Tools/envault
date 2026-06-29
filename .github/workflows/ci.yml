@@ -28,8 +28,8 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install --upgrade pip
-          pip install -e ".[dev]"
+          pip install --upgrade pip setuptools wheel
+          pip install -e ".[dev]" --no-build-isolation
 
       - name: Lint with ruff
         run: pip install ruff && ruff check src/ --target-version py310
