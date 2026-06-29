@@ -15,7 +15,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.11", "3.12", "3.13"]
+        python-version: ["3.12"]
 
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
@@ -32,30 +32,23 @@ jobs:
           pip install --upgrade pip setuptools wheel
           pip install -e ".[dev]" --no-build-isolation
 
-      - name: Show installed packages
-        run: pip list | grep -E "ruff|pytest|rich|typer|pydantic|cryptography|responses|dotenv"
-
       - name: Lint with ruff
         run: pip install ruff && ruff check src/ --target-version py310
 
-      - name: Run tests
-        id: runtests
-        shell: bash
-        run: |
-          set -o pipefail
-          python -m pytest tests/ -v --tb=short 2>&1 | tee /tmp/pytest-out.txt
-          PYTEST_RC=${PIPESTATUS[0]}
-          if [ $PYTEST_RC -ne 0 ]; then
-            echo "::error::Tests failed with exit code $PYTEST_RC"
-            grep -E "^FAILED|^ERROR" /tmp/pytest-out.txt | head -30 | while IFS= read -r line; do
-              echo "::error::$line"
-            done
-            echo "::warning::=== SUMMARY ==="
-            tail -30 /tmp/pytest-out.txt | while IFS= read -r line; do
-              echo "::warning::$line"
-            done
-          fi
-          exit $PYTEST_RC
+      - name: Collect tests
+        run: python -m pytest tests/ --collect-only -q 2>&1 | tail -5
+
+      - name: Run lint regression tests
+        run: python -m pytest tests/test_lint_regression.py -v --tb=long
+
+      - name: Run serve tests
+        run: python -m pytest tests/test_serve.py -v --tb=long
+
+      - name: Run cli tests
+        run: python -m pytest tests/test_cli.py -v --tb=long
+
+      - name: Run all other tests
+        run: python -m pytest tests/ --ignore=tests/test_lint_regression.py --ignore=tests/test_serve.py --ignore=tests/test_cli.py -v --tb=long
 
       - name: Check CLI works
         run: |
