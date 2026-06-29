@@ -41,7 +41,9 @@ def test_audit_log_with_target_path(tmp_path):
 def test_audit_log_with_details(tmp_path):
     """log() with details dict should include 'details' key in entry."""
     log = AuditLogger(str(tmp_path / "audit.log"))
-    log.log("rotate", "API_KEY", details={"strategy": "source_wins", "old_prefix": "sk_"})
+    log.log(
+        "rotate", "API_KEY", details={"strategy": "source_wins", "old_prefix": "sk_"}
+    )
     history = log.get_history()
     assert len(history) == 1
     assert history[0]["details"]["strategy"] == "source_wins"
@@ -64,7 +66,9 @@ def test_audit_log_malformed_line(tmp_path):
     """get_history skips lines that are not valid JSON."""
     log_path = tmp_path / "audit.log"
     # Write a mix of valid and invalid lines
-    log_path.write_text('{"action":"add","key":"K1"}\nnot-json\n{"action":"add","key":"K2"}\n')
+    log_path.write_text(
+        '{"action":"add","key":"K1"}\nnot-json\n{"action":"add","key":"K2"}\n'
+    )
     log = AuditLogger(str(log_path))
     history = log.get_history()
     assert len(history) == 2  # Only the valid JSON lines
@@ -94,6 +98,7 @@ def test_config_load_empty_yaml(tmp_path):
 def test_config_get_store_existing(tmp_path):
     """get_store() returns the store config when it exists."""
     from envault.config import SecretStoreConfig
+
     config = EnvaultConfig()
     store_cfg = SecretStoreConfig(type="vault", url="http://vault:8200")
     config.stores["myvault"] = store_cfg
@@ -217,6 +222,7 @@ def test_rotate_env_var_special_chars_in_new_value(tmp_path):
     assert success
     # The file should still be parseable (key=value or key="value")
     from dotenv import dotenv_values
+
     reloaded = dotenv_values(str(env_file))
     assert "WEBHOOK_URL" in reloaded
 
@@ -236,7 +242,9 @@ def test_rotate_env_var_dry_run_with_audit(tmp_path):
     audit_log = str(tmp_path / "audit.log")
     audit = AuditLogger(audit_log)
 
-    success, new_val = rotate_env_var("DB_PASSWORD", str(env_file), dry_run=True, audit=audit)
+    success, new_val = rotate_env_var(
+        "DB_PASSWORD", str(env_file), dry_run=True, audit=audit
+    )
     assert success
     assert new_val != "oldpass"
     # Dry run should NOT log audit
@@ -295,6 +303,7 @@ def test_to_json_parses():
     """to_json should produce valid JSON that round-trips through to_dict."""
     result = diff_envs({"X": "1", "Y": "2"}, {"X": "1", "Y": "changed", "Z": "3"})
     import json
+
     parsed = json.loads(result.to_json(source_label="s", target_label="t"))
     assert parsed["has_differences"] is True
     assert "Y" in parsed["different"]
@@ -307,6 +316,7 @@ def test_to_json_compact():
     compact = result.to_json(indent=None)
     assert "\n" not in compact
     import json
+
     assert json.loads(compact)["has_differences"] is True
 
 
@@ -314,7 +324,10 @@ def test_to_json_custom_labels():
     """to_json should use custom source/target labels in the different dict."""
     result = diff_envs({"K": "old"}, {"K": "new"})
     import json
-    parsed = json.loads(result.to_json(source_label="staging", target_label="production"))
+
+    parsed = json.loads(
+        result.to_json(source_label="staging", target_label="production")
+    )
     assert "staging" in parsed["different"]["K"]
     assert "production" in parsed["different"]["K"]
 
