@@ -10,11 +10,14 @@ from .diff import load_env_file
 
 class SyncConflict(Exception):
     """Raised when a sync conflict cannot be auto-resolved."""
+
     def __init__(self, key: str, source_value: str, target_value: str):
         self.key = key
         self.source_value = source_value
         self.target_value = target_value
-        super().__init__(f"Conflict on '{key}': source='{source_value[:20]}...' vs target='{target_value[:20]}...'")
+        super().__init__(
+            f"Conflict on '{key}': source='{source_value[:20]}...' vs target='{target_value[:20]}...'"
+        )
 
 
 class SyncResult:
@@ -159,7 +162,8 @@ def sync_env_files(
     target = load_env_file(target_path)
 
     result = sync_envs(
-        source, target,
+        source,
+        target,
         strategy=strategy,
         allow_delete=allow_delete,
         skip_keys=skip_keys,
@@ -169,9 +173,16 @@ def sync_env_files(
         write_env_file(target_path, target)
         if audit:
             for k in result.added:
-                audit.log("add", k, source_path=str(source_path), target_path=str(target_path))
+                audit.log(
+                    "add", k, source_path=str(source_path), target_path=str(target_path)
+                )
             for k in result.updated:
-                audit.log("update", k, source_path=str(source_path), target_path=str(target_path))
+                audit.log(
+                    "update",
+                    k,
+                    source_path=str(source_path),
+                    target_path=str(target_path),
+                )
             for k in result.deleted:
                 audit.log("delete", k, target_path=str(target_path))
 
