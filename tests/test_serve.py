@@ -6,7 +6,37 @@ import io
 import json
 from unittest.mock import MagicMock
 
+import pytest
+
+from envault.config import EnvaultConfig
+from envault.serve import SecretHandler, create_handler
+
 # ── Fixtures ────────────────────────────────────────────────────────────────
+
+
+class _FakeStore:
+    """Minimal in-memory secret store for testing."""
+
+    def __init__(self, data: dict[str, str]) -> None:
+        self._data = dict(data)
+
+    def get(self, key: str) -> str | None:
+        return self._data.get(key)
+
+    def set(self, key: str, value: str) -> bool:
+        self._data[key] = value
+        return True
+
+    def delete(self, key: str) -> bool:
+        if key in self._data:
+            del self._data[key]
+            return True
+        return False
+
+    def list_keys(self, prefix: str = "") -> list[str]:
+        if prefix:
+            return [k for k in self._data if k.startswith(prefix)]
+        return list(self._data.keys())
 
 
 
@@ -42,6 +72,7 @@ def _make_handler(store, config: EnvaultConfig | None = None, api_key: str | Non
     """
     config = config or EnvaultConfig()
     handler_class = create_handler(store, config, encrypt_key="test-key", api_key=api_key)
+    return _build_handler_instance(handler_class)
 
 @pytest.mark.parametrize("api_token", [pytest.param("", id="empty_string"), pytest.param("   ", id="whitespace"), pytest.param('xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx', id="long_string"), pytest.param('héllo wörld', id="unicode"), pytest.param('line1\nline2', id="with_newline")])
 def test_create_handler_api_token_edge_cases(api_token, store=..., config=..., encrypt_key=..., api_key=..., auth_mode=..., oauth_introspect_url=..., oauth_userinfo_url=..., oauth_client_id=..., oauth_client_secret=...):
@@ -70,6 +101,7 @@ def _build_handler_instance(handler_class):
     instance.server = MagicMock()
     instance.command = "GET"
     instance.request_version = "HTTP/1.1"
+    instance.headers = {}
 
     # Track what _send_json writes so we can assert on it
     instance._sent_json = None
@@ -129,6 +161,15 @@ def test_create_handler_oauth_client_secret_edge_cases(oauth_client_secret, stor
     pass
 
 
+
+class TestSecretsList:
+    """Tests for GET /secrets endpoint — list all keys."""
+
+    def test_list_keys(self):
+        store = _FakeStore({"DB_HOST": "localhost", "DB_PORT": "5432", "API_KEY": "abc"})
+        handler = _make_handler(store)
+        handler.path = "/secrets"
+        handler.do_GET()
 
         assert handler._sent_status == 200
         data = handler._sent_json
