@@ -42,11 +42,17 @@ _oauth2_cache: dict[str, tuple[bool, float]] = {}
 class SecretHandler(BaseHTTPRequestHandler):
     """HTTP request handler for the envault secrets API."""
 
-    # Set by run_server() before the server starts
+    # Set by create_handler() before the server starts
     store: SecretStore
     config: EnvaultConfig
-    encrypt_key: str | None
-    api_key: str | None  # Bearer token for API auth; None = auth disabled
+    encrypt_key: str | None = None
+    api_key: str | None = None
+    api_token: str | None = None
+    oauth_introspect_url: str | None = None
+    oauth_userinfo_url: str | None = None
+    oauth_client_id: str | None = None
+    oauth_client_secret: str | None = None
+    auth_mode: str = "any"
 
     # -- Helpers ---------------------------------------------------------------
 
@@ -114,7 +120,7 @@ class SecretHandler(BaseHTTPRequestHandler):
 
         # Otherwise, fall back to static token check
         if token != (self.api_token or ""):
-            self._send_error(403, "Forbidden: invalid token")
+            self._send_error(401, "Unauthorized: invalid Bearer token")
             return False
 
         return True
@@ -279,7 +285,7 @@ class SecretHandler(BaseHTTPRequestHandler):
                 self._send_error(401, "Unauthorized: X-API-Key header required")
                 return False
             if api_key_header != self.api_key:
-                self._send_error(403, "Forbidden: invalid API key")
+                self._send_error(401, "Unauthorized: invalid API key")
                 return False
             return True
 
@@ -297,7 +303,7 @@ class SecretHandler(BaseHTTPRequestHandler):
                 if api_key_header == self.api_key:
                     return True
                 # API key was provided but wrong -- return error immediately
-                self._send_error(403, "Forbidden: invalid API key")
+                self._send_error(401, "Unauthorized: invalid API key")
                 return False
 
             # Fall through to Bearer token check
@@ -434,11 +440,17 @@ def _get_api_key(cli_key: str | None = None) -> str | None:
 
 
 def create_handler(
-     store: SecretStore,
-     config: EnvaultConfig,
-     encrypt_key: str | None = None,
-     api_key: str | None = None,
- ):
+    store: SecretStore,
+    config: EnvaultConfig,
+    encrypt_key: str | None = None,
+    api_key: str | None = None,
+    api_token: str | None = None,
+    oauth_introspect_url: str | None = None,
+    oauth_userinfo_url: str | None = None,
+    oauth_client_id: str | None = None,
+    oauth_client_secret: str | None = None,
+    auth_mode: str = "any",
+):
     """Return a BaseHTTPRequestHandler subclass bound to the given store/config.
 
     This avoids mutating the class-level attributes on SecretHandler directly,
@@ -452,6 +464,12 @@ def create_handler(
     _Handler.config = config  # type: ignore[attr-defined]
     _Handler.encrypt_key = encrypt_key  # type: ignore[attr-defined]
     _Handler.api_key = api_key  # type: ignore[attr-defined]
+    _Handler.api_token = api_token  # type: ignore[attr-defined]
+    _Handler.oauth_introspect_url = oauth_introspect_url  # type: ignore[attr-defined]
+    _Handler.oauth_userinfo_url = oauth_userinfo_url  # type: ignore[attr-defined]
+    _Handler.oauth_client_id = oauth_client_id  # type: ignore[attr-defined]
+    _Handler.oauth_client_secret = oauth_client_secret  # type: ignore[attr-defined]
+    _Handler.auth_mode = auth_mode  # type: ignore[attr-defined]
     return _Handler
 
 
