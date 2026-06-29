@@ -71,7 +71,11 @@ def _make_handler(store, config: EnvaultConfig | None = None, api_key: str | Non
     SecretHandler but uses pre-set wfile/rfile so we can inspect output.
     """
     config = config or EnvaultConfig()
-    handler_class = create_handler(store, config, encrypt_key="test-key", api_key=api_key)
+    # api_token mirrors api_key so Bearer auth works in tests
+    handler_class = create_handler(
+        store, config, encrypt_key="test-key", api_key=api_key,
+        api_token=api_key, auth_mode="bearer" if api_key else "any",
+    )
     return _build_handler_instance(handler_class)
 
 @pytest.mark.parametrize("api_token", [pytest.param("", id="empty_string"), pytest.param("   ", id="whitespace"), pytest.param('xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx', id="long_string"), pytest.param('héllo wörld', id="unicode"), pytest.param('line1\nline2', id="with_newline")])
@@ -492,6 +496,7 @@ class TestServeCLI:
     def test_serve_help(self):
         """serve --help should show endpoint descriptions."""
         from typer.testing import CliRunner
+
         from envault.cli import app
 
         runner = CliRunner()
@@ -503,6 +508,7 @@ class TestServeCLI:
     def test_serve_help_shows_api_key_option(self):
         """serve --help should show the --api-key option."""
         from typer.testing import CliRunner
+
         from envault.cli import app
 
         runner = CliRunner()
@@ -513,6 +519,7 @@ class TestServeCLI:
     def test_serve_help_shows_default_host_localhost(self):
         """serve --help should show default host as 127.0.0.1."""
         from typer.testing import CliRunner
+
         from envault.cli import app
 
         runner = CliRunner()
@@ -522,9 +529,6 @@ class TestServeCLI:
 
     def test_serve_no_encrypt_key_exits(self, tmp_path):
         """serve without any encryption key should exit with error."""
-        import os
-        from typer.testing import CliRunner
-        from envault.cli import app
 
 
 @pytest.mark.parametrize("auth_mode", [pytest.param("", id="empty_string"), pytest.param("   ", id="whitespace"), pytest.param('xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx', id="long_string"), pytest.param('héllo wörld', id="unicode"), pytest.param('line1\nline2', id="with_newline")])
