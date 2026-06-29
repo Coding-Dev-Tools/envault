@@ -42,7 +42,9 @@ class AuditLogger:
         with open(self.log_path, "a") as f:
             f.write(json.dumps(entry) + "\n")
 
-    def get_history(self, key: str | None = None, action: str | None = None, limit: int = 50) -> list[dict]:
+    def get_history(
+        self, key: str | None = None, action: str | None = None, limit: int = 50
+    ) -> list[dict]:
         """Get audit history, optionally filtered by key and/or action."""
         path = Path(self.log_path)
         if not path.exists():
