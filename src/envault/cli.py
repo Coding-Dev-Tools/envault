@@ -90,6 +90,7 @@ def diff(
         False, "--fail-on-missing",
         help="Exit with code 1 if source has keys not in target",
     ),
+    json_output: bool = typer.Option(False, "--json", "-j", help="Output as JSON"),
 ):
     """Diff environment variables between two environments or .env files."""
     config = load_config(config_path)
@@ -106,11 +107,6 @@ def diff(
     except FileNotFoundError as e:
         err_console.print(f"[red]Error:[/red] {e}")
         raise typer.Exit(code=1) from None
-
-    if json_output:
-        console.print(result.to_json(source_label=label_s, target_label=label_t))
-    else:
-        console.print(format_diff(result, label_s, label_t))
 
     if json_output:
         console.print(result.to_json(source_label=label_s, target_label=label_t))
@@ -134,6 +130,7 @@ def diff_files(
         False, "--fail-on-missing",
         help="Exit with code 1 if source has keys not in target",
     ),
+    json_output: bool = typer.Option(False, "--json", "-j", help="Output as JSON"),
 ):
     """Diff two .env files directly (no config needed)."""
     result = diff_env_files(file1, file2)
