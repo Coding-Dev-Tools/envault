@@ -27,8 +27,7 @@ def _make_config(tmp_path, env_map):
     config = {
         "project": "test",
         "environments": [
-            {"name": name, "env_file": path}
-            for name, path in env_map.items()
+            {"name": name, "env_file": path} for name, path in env_map.items()
         ],
     }
     config_path = tmp_path / ".envault.yml"
@@ -47,10 +46,16 @@ def test_diff_with_env_name_not_file(tmp_path):
 
     config_path = _make_config(tmp_path, {"dev": str(dev_env), "prod": str(prod_env)})
 
-    result = runner.invoke(app, [
-        "diff", "dev", "prod",
-        "--config", str(config_path),
-    ])
+    result = runner.invoke(
+        app,
+        [
+            "diff",
+            "dev",
+            "prod",
+            "--config",
+            str(config_path),
+        ],
+    )
     assert result.exit_code == 0
     assert "B" in result.output
 
@@ -66,12 +71,19 @@ def test_sync_dry_run_conflicts_skipped(tmp_path):
 
     config_path = _make_config(tmp_path, {"dev": str(dev_env), "prod": str(prod_env)})
 
-    result = runner.invoke(app, [
-        "sync", "dev", "prod",
-        "--config", str(config_path),
-        "--dry-run",
-        "--strategy", "error",
-    ])
+    result = runner.invoke(
+        app,
+        [
+            "sync",
+            "dev",
+            "prod",
+            "--config",
+            str(config_path),
+            "--dry-run",
+            "--strategy",
+            "error",
+        ],
+    )
     # With --strategy error and conflicting A, should show conflicts
     assert result.exit_code == 0 or result.exit_code == 1
 
@@ -87,11 +99,18 @@ def test_sync_with_conflicts_exits_1(tmp_path):
 
     config_path = _make_config(tmp_path, {"dev": str(dev_env), "prod": str(prod_env)})
 
-    result = runner.invoke(app, [
-        "sync", "dev", "prod",
-        "--config", str(config_path),
-        "--strategy", "error",
-    ])
+    result = runner.invoke(
+        app,
+        [
+            "sync",
+            "dev",
+            "prod",
+            "--config",
+            str(config_path),
+            "--strategy",
+            "error",
+        ],
+    )
     assert result.exit_code == 1
     # Conflict detail goes to err_console (stderr); exit code is enough
 
@@ -107,21 +126,32 @@ def test_sync_with_deleted_keys(tmp_path):
 
     config_path = _make_config(tmp_path, {"dev": str(dev_env), "prod": str(prod_env)})
 
-    result = runner.invoke(app, [
-        "sync", "dev", "prod",
-        "--config", str(config_path),
-        "--allow-delete",
-    ])
+    result = runner.invoke(
+        app,
+        [
+            "sync",
+            "dev",
+            "prod",
+            "--config",
+            str(config_path),
+            "--allow-delete",
+        ],
+    )
     assert result.exit_code == 0
 
 
 def test_rotate_missing_env_file(tmp_path):
     """rotate with nonexistent env file exits 1 (cli.py:193-194)."""
     runner = CliRunner()
-    result = runner.invoke(app, [
-        "rotate", "MY_KEY",
-        "--env", str(tmp_path / "nonexistent.env"),
-    ])
+    result = runner.invoke(
+        app,
+        [
+            "rotate",
+            "MY_KEY",
+            "--env",
+            str(tmp_path / "nonexistent.env"),
+        ],
+    )
     assert result.exit_code == 1
     assert "not found" in result.output.lower() or "Error" in result.output
 
@@ -137,10 +167,12 @@ class TestPackagingQuality:
         with open(pyproject, "rb") as f:
             data = tomllib.load(f)
         pkg_data = data.get("tool", {}).get("setuptools", {}).get("package-data", {})
-        assert "envault" in pkg_data, \
+        assert "envault" in pkg_data, (
             "Expected [tool.setuptools.package-data] section for 'envault'"
-        assert "py.typed" in pkg_data["envault"], \
+        )
+        assert "py.typed" in pkg_data["envault"], (
             f"Expected 'py.typed' in package-data for envault, got {pkg_data['envault']}"
+        )
 
     def test_ruff_known_first_party(self):
         """ruff known-first-party should be ['envault'], not ['*']."""
@@ -149,6 +181,8 @@ class TestPackagingQuality:
         pyproject = Path(__file__).parent.parent / "pyproject.toml"
         with open(pyproject, "rb") as f:
             data = tomllib.load(f)
-        isort_cfg = data.get("tool", {}).get("ruff", {}).get("lint", {}).get("isort", {})
+        isort_cfg = (
+            data.get("tool", {}).get("ruff", {}).get("lint", {}).get("isort", {})
+        )
         kfp = isort_cfg.get("known-first-party", [])
         assert kfp == ["envault"], f"known-first-party should be ['envault'], got {kfp}"
