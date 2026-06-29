@@ -15,7 +15,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.12"]
+        python-version: ["3.11", "3.12", "3.13"]
 
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
@@ -35,28 +35,10 @@ jobs:
       - name: Lint with ruff
         run: pip install ruff && ruff check src/ --target-version py310
 
-      - name: Run serve tests (capture output)
-        id: serve_tests
-        continue-on-error: true
-        run: |
-          python -m pytest tests/test_serve.py -v --tb=long > /tmp/serve-out.txt 2>&1
-          echo "pytest_exit=$?" >> $GITHUB_OUTPUT
-
-      - name: Report serve test results
-        if: always()
-        run: |
-          echo "=== SERVE TEST OUTPUT ==="
-          cat /tmp/serve-out.txt || echo "No output file"
-          echo "=== END ==="
-          # Emit annotations for failures
-          grep -E "^(FAILED|ERROR|  )" /tmp/serve-out.txt | head -50 | while IFS= read -r line; do
-            echo "::error file=tests/test_serve.py::$line"
-          done || true
-
-      - name: Fail if serve tests failed
-        if: steps.serve_tests.outcome == 'failure'
-        run: exit 1
+      - name: Run tests
+        env:
+          NO_COLOR: "1"
+        run: python -m pytest tests/ -v --tb=short
 
       - name: Check CLI works
-        run: |
-          rh-envault --help
+        run: rh-envault --help
