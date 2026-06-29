@@ -20,6 +20,7 @@ import base64
 import json
 import os
 import secrets as _secrets
+import time
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from pathlib import Path
 from typing import Any
@@ -33,6 +34,9 @@ from envault.stores import SecretStore, LocalEnvStore, get_store
 
 # Environment variable for API authentication key
 API_KEY_ENV_VAR = "ENVAULT_API_KEY"
+
+_OAUTH2_CACHE_TTL: float = 300.0  # seconds
+_oauth2_cache: dict[str, tuple[bool, float]] = {}
 
 
 class SecretHandler(BaseHTTPRequestHandler):
@@ -458,6 +462,12 @@ def run_server(
     encrypt_key: str | None = None,
     store_name: str | None = None,
     api_key: str | None = None,
+    api_token: str | None = None,
+    oauth_introspect_url: str | None = None,
+    oauth_userinfo_url: str | None = None,
+    oauth_client_id: str | None = None,
+    oauth_client_secret: str | None = None,
+    auth_mode: str = "any",
 ) -> None:
     """Start the HTTP server for the secrets API.
 
