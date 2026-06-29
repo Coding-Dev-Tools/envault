@@ -9,6 +9,7 @@ from pathlib import Path
 
 # ── Issue types ──────────────────────────────────────────────────────────────
 
+
 @dataclass
 class SecurityIssue:
     """A single security finding in a .env file."""
@@ -73,9 +74,27 @@ class SecurityAuditResult:
 
 # Known weak/test values that should never appear in real secrets
 WEAK_VALUES: dict[str, list[str]] = {
-    "generic": ["password", "secret", "changeme", "123456", "admin", "test", "example", "todo", "fixme", "xxx"],
+    "generic": [
+        "password",
+        "secret",
+        "changeme",
+        "123456",
+        "admin",
+        "test",
+        "example",
+        "todo",
+        "fixme",
+        "xxx",
+    ],
     "database": ["root", "postgres", "sa", "dbadmin"],
-    "api_key": ["sk_test_", "pk_test_", "your_api_key", "xxx", "key_here", "api_key_here"],
+    "api_key": [
+        "sk_test_",
+        "pk_test_",
+        "your_api_key",
+        "xxx",
+        "key_here",
+        "api_key_here",
+    ],
 }
 
 # Keys that typically hold high-value secrets and must not be weak
@@ -134,7 +153,7 @@ def _is_weak_value(key: str, value: str) -> tuple[bool, str]:
         # For short/generic words, require word boundary match
         # For longer patterns (e.g. "sk_test_"), use substring match
         if len(weak_val) <= 6:
-            return bool(re.search(r'\b' + re.escape(weak_val) + r'\b', text))
+            return bool(re.search(r"\b" + re.escape(weak_val) + r"\b", text))
         else:
             return weak_val in text
 
@@ -164,7 +183,10 @@ def _is_hardcoded_secret(key: str, value: str) -> tuple[bool, str]:
         if pattern.search(value):
             # For base64 patterns, require some non-alphanumeric chars to avoid
             # false positives on long alphanumeric strings (e.g. "aVeryStrongRandomValue12345")
-            if description in ("Base64-encoded secret detected", "Possible AWS Secret Access Key") and not re.search(r"[/+=]", value):
+            if description in (
+                "Base64-encoded secret detected",
+                "Possible AWS Secret Access Key",
+            ) and not re.search(r"[/+=]", value):
                 continue
             return True, description
     return False, ""
@@ -194,29 +216,35 @@ def _check_file_permissions(file_path: Path) -> list[SecurityIssue]:
         mode = file_path.stat().st_mode
         # Check if group or others can read
         if mode & stat.S_IRGRP:
-            issues.append(SecurityIssue(
-                severity="high",
-                category="permissions",
-                key="",
-                message=f"File is group-readable (mode={oct(mode & 0o777)})",
-                suggestion="Run: chmod 600 <file> to restrict to owner only",
-            ))
+            issues.append(
+                SecurityIssue(
+                    severity="high",
+                    category="permissions",
+                    key="",
+                    message=f"File is group-readable (mode={oct(mode & 0o777)})",
+                    suggestion="Run: chmod 600 <file> to restrict to owner only",
+                )
+            )
         if mode & stat.S_IROTH:
-            issues.append(SecurityIssue(
-                severity="critical",
-                category="permissions",
-                key="",
-                message=f"File is world-readable (mode={oct(mode & 0o777)})",
-                suggestion="Run: chmod 600 <file> to restrict to owner only",
-            ))
+            issues.append(
+                SecurityIssue(
+                    severity="critical",
+                    category="permissions",
+                    key="",
+                    message=f"File is world-readable (mode={oct(mode & 0o777)})",
+                    suggestion="Run: chmod 600 <file> to restrict to owner only",
+                )
+            )
         if mode & stat.S_IWGRP:
-            issues.append(SecurityIssue(
-                severity="medium",
-                category="permissions",
-                key="",
-                message=f"File is group-writable (mode={oct(mode & 0o777)})",
-                suggestion="Run: chmod 600 <file> to restrict to owner only",
-            ))
+            issues.append(
+                SecurityIssue(
+                    severity="medium",
+                    category="permissions",
+                    key="",
+                    message=f"File is group-writable (mode={oct(mode & 0o777)})",
+                    suggestion="Run: chmod 600 <file> to restrict to owner only",
+                )
+            )
     except OSError:
         pass  # Permission checks not available on some platforms / file systems
     return issues
@@ -256,7 +284,11 @@ def _check_gitignore(file_path: Path) -> list[SecurityIssue]:
                     # *.ext glob pattern (e.g. *.env matches .env, .env.dev, .env.prod)
                     if line.startswith("*."):
                         ext = line[2:]  # e.g. "env"
-                        if filename == f".{ext}" or filename.startswith(f".{ext}.") or filename.startswith(f".{ext}-"):
+                        if (
+                            filename == f".{ext}"
+                            or filename.startswith(f".{ext}.")
+                            or filename.startswith(f".{ext}-")
+                        ):
                             is_ignored = True
                             break
                         # Also handle non-dot files: *.key matches server.key
@@ -284,28 +316,37 @@ def _check_gitignore(file_path: Path) -> list[SecurityIssue]:
         current = parent
 
     if gitignore_found and not is_ignored:
-        issues.append(SecurityIssue(
-            severity="critical",
-            category="gitignore",
-            key="",
-            message=f"'{file_path.name}' is not in .gitignore — secrets may be committed to version control",
-            suggestion=f"Add '{file_path.name}' to .gitignore",
-        ))
+        issues.append(
+            SecurityIssue(
+                severity="critical",
+                category="gitignore",
+                key="",
+                message=f"'{file_path.name}' is not in .gitignore — secrets may be committed to version control",
+                suggestion=f"Add '{file_path.name}' to .gitignore",
+            )
+        )
 
     # Don't flag missing gitignore if we already flagged a specific file issue
     if not gitignore_found and not issues and repo_root_found:
-        issues.append(SecurityIssue(
-            severity="medium",
-            category="gitignore",
-            key="",
-            message="No .gitignore found — .env files may be committed to version control",
-            suggestion="Add a .gitignore and include .env files",
-        ))
+        issues.append(
+            SecurityIssue(
+                severity="medium",
+                category="gitignore",
+                key="",
+                message="No .gitignore found — .env files may be committed to version control",
+                suggestion="Add a .gitignore and include .env files",
+            )
+        )
 
     return issues
 
 
-def audit_env_file(file_path: str | Path, *, check_permissions: bool = True, check_gitignore: bool = True) -> SecurityAuditResult:
+def audit_env_file(
+    file_path: str | Path,
+    *,
+    check_permissions: bool = True,
+    check_gitignore: bool = True,
+) -> SecurityAuditResult:
     """Run a security audit on a .env file.
 
     Args:
@@ -320,12 +361,14 @@ def audit_env_file(file_path: str | Path, *, check_permissions: bool = True, che
     result = SecurityAuditResult(file_path=str(file_path))
 
     if not file_path.exists():
-        result.issues.append(SecurityIssue(
-            severity="info",
-            category="missing",
-            key="",
-            message=f"File '{file_path}' does not exist",
-        ))
+        result.issues.append(
+            SecurityIssue(
+                severity="info",
+                category="missing",
+                key="",
+                message=f"File '{file_path}' does not exist",
+            )
+        )
         return result
 
     content = file_path.read_text(encoding="utf-8", errors="replace")
@@ -343,24 +386,28 @@ def audit_env_file(file_path: str | Path, *, check_permissions: bool = True, che
 
     # Empty file
     if not content.strip():
-        result.issues.append(SecurityIssue(
-            severity="info",
-            category="empty",
-            key="",
-            message="File is empty",
-        ))
+        result.issues.append(
+            SecurityIssue(
+                severity="info",
+                category="empty",
+                key="",
+                message="File is empty",
+            )
+        )
         return result
 
     # Duplicate keys
     duplicates = _check_duplicate_keys(content)
     for dup_key in duplicates:
-        result.issues.append(SecurityIssue(
-            severity="medium",
-            category="duplicate_key",
-            key=dup_key,
-            message=f"Duplicate key '{dup_key}' — last assignment wins, earlier values are masked",
-            suggestion="Remove the duplicate assignment",
-        ))
+        result.issues.append(
+            SecurityIssue(
+                severity="medium",
+                category="duplicate_key",
+                key=dup_key,
+                message=f"Duplicate key '{dup_key}' — last assignment wins, earlier values are masked",
+                suggestion="Remove the duplicate assignment",
+            )
+        )
 
     # ── Per-key checks ────────────────────────────────────────────────────
 
@@ -377,97 +424,129 @@ def audit_env_file(file_path: str | Path, *, check_permissions: bool = True, che
 
         # Unquote value
         value = raw_value.strip()
-        if len(value) >= 2 and ((value.startswith('"') and value.endswith('"')) or (value.startswith("'") and value.endswith("'"))):
+        if len(value) >= 2 and (
+            (value.startswith('"') and value.endswith('"'))
+            or (value.startswith("'") and value.endswith("'"))
+        ):
             value = value[1:-1]
 
         # 1. Weak/placeholder secrets
         is_weak, weak_reason = _is_weak_value(key, value)
         if is_weak:
-            result.issues.append(SecurityIssue(
-                severity="high" if NEVER_COMMIT_KEYS.search(key) else "medium",
-                category="weak_secret",
-                key=key,
-                message=f"Weak/placeholder value for '{key}': {weak_reason}",
-                suggestion="Replace with a strong generated secret (use 'envault rotate')",
-            ))
+            result.issues.append(
+                SecurityIssue(
+                    severity="high" if NEVER_COMMIT_KEYS.search(key) else "medium",
+                    category="weak_secret",
+                    key=key,
+                    message=f"Weak/placeholder value for '{key}': {weak_reason}",
+                    suggestion="Replace with a strong generated secret (use 'envault rotate')",
+                )
+            )
 
         # 2. Hardcoded secrets that look real (and thus dangerous in .env)
         is_hardcoded, hardcoded_desc = _is_hardcoded_secret(key, value)
         if is_hardcoded:
-            result.issues.append(SecurityIssue(
-                severity="critical",
-                category="hardcoded_credential",
-                key=key,
-                message=f"'{key}': {hardcoded_desc}",
-                suggestion="Move to a secret store (e.g. envault store set) and reference via store integration",
-            ))
+            result.issues.append(
+                SecurityIssue(
+                    severity="critical",
+                    category="hardcoded_credential",
+                    key=key,
+                    message=f"'{key}': {hardcoded_desc}",
+                    suggestion="Move to a secret store (e.g. envault store set) and reference via store integration",
+                )
+            )
 
         # 3. Never-commit keys found in plain .env
-        if NEVER_COMMIT_KEYS.search(key) and value and not _is_weak_value(key, value)[0]:
+        if (
+            NEVER_COMMIT_KEYS.search(key)
+            and value
+            and not _is_weak_value(key, value)[0]
+        ):
             # Only flag if not already flagged at higher severity
             already_flagged = any(
                 i.key == key and i.category == "hardcoded_credential"
                 for i in result.issues
             )
             if not already_flagged:
-                result.issues.append(SecurityIssue(
-                    severity="high",
-                    category="sensitive_in_plain_file",
-                    key=key,
-                    message=f"'{key}' is a high-sensitivity key stored in plain .env file",
-                    suggestion="Encrypt with 'envault encrypt' or move to a secret store",
-                ))
+                result.issues.append(
+                    SecurityIssue(
+                        severity="high",
+                        category="sensitive_in_plain_file",
+                        key=key,
+                        message=f"'{key}' is a high-sensitivity key stored in plain .env file",
+                        suggestion="Encrypt with 'envault encrypt' or move to a secret store",
+                    )
+                )
 
         # 4. Encryption recommended
-        if ENCRYPTION_RECOMMENDED_KEYS.search(key) and value and not _is_weak_value(key, value)[0]:
+        if (
+            ENCRYPTION_RECOMMENDED_KEYS.search(key)
+            and value
+            and not _is_weak_value(key, value)[0]
+        ):
             # Only flag if not already flagged as hardcoded or sensitive
             already_flagged = any(
-                i.key == key and i.category in ("hardcoded_credential", "sensitive_in_plain_file")
+                i.key == key
+                and i.category in ("hardcoded_credential", "sensitive_in_plain_file")
                 for i in result.issues
             )
             if not already_flagged:
-                result.issues.append(SecurityIssue(
-                    severity="low",
-                    category="encryption_recommended",
-                    key=key,
-                    message=f"'{key}' stores a secret — consider encrypting at rest",
-                    suggestion="Use 'envault encrypt' or a secret store integration",
-                ))
+                result.issues.append(
+                    SecurityIssue(
+                        severity="low",
+                        category="encryption_recommended",
+                        key=key,
+                        message=f"'{key}' stores a secret — consider encrypting at rest",
+                        suggestion="Use 'envault encrypt' or a secret store integration",
+                    )
+                )
 
         # 5. Rotation recommended
         if ROTATION_RECOMMENDED_KEYS.search(key):
-            result.issues.append(SecurityIssue(
-                severity="info",
-                category="rotation_recommended",
-                key=key,
-                message=f"'{key}' should be rotated periodically",
-                suggestion="Use 'envault rotate' to generate a new value",
-            ))
+            result.issues.append(
+                SecurityIssue(
+                    severity="info",
+                    category="rotation_recommended",
+                    key=key,
+                    message=f"'{key}' should be rotated periodically",
+                    suggestion="Use 'envault rotate' to generate a new value",
+                )
+            )
 
         # 6. Unquoted values with special characters (shell injection risk)
-        if raw_value.strip() and not raw_value.strip().startswith(('"', "'")) and any(c in value for c in " $`\\!#"):
-            result.issues.append(SecurityIssue(
-                severity="low",
-                category="unquoted_value",
-                key=key,
-                message=f"'{key}' has unquoted value containing special characters — may cause shell expansion issues",
-                suggestion="Quote the value: {key}=\"{value}\"",
-            ))
+        if (
+            raw_value.strip()
+            and not raw_value.strip().startswith(('"', "'"))
+            and any(c in value for c in " $`\\!#")
+        ):
+            result.issues.append(
+                SecurityIssue(
+                    severity="low",
+                    category="unquoted_value",
+                    key=key,
+                    message=f"'{key}' has unquoted value containing special characters — may cause shell expansion issues",
+                    suggestion='Quote the value: {key}="{value}"',
+                )
+            )
 
         # 7. Inline comments without quoting (dotenv misparse risk)
         if not raw_value.strip().startswith(('"', "'")) and " #" in raw_value:
-            result.issues.append(SecurityIssue(
-                severity="low",
-                category="inline_comment",
-                key=key,
-                message=f"'{key}' has an inline comment — dotenv parsers may include '#...' in the value",
-                suggestion="Quote the value or put comments on separate lines",
-            ))
+            result.issues.append(
+                SecurityIssue(
+                    severity="low",
+                    category="inline_comment",
+                    key=key,
+                    message=f"'{key}' has an inline comment — dotenv parsers may include '#...' in the value",
+                    suggestion="Quote the value or put comments on separate lines",
+                )
+            )
 
     return result
 
 
-def format_audit_report(results: list[SecurityAuditResult], *, verbose: bool = False) -> str:
+def format_audit_report(
+    results: list[SecurityAuditResult], *, verbose: bool = False
+) -> str:
     """Format security audit results into a human-readable report.
 
     Args:
@@ -505,7 +584,9 @@ def format_audit_report(results: list[SecurityAuditResult], *, verbose: bool = F
             }.get(issue.severity, "  ")
 
             key_part = f"[{issue.key}] " if issue.key else ""
-            lines.append(f"  {severity_icon} {issue.severity.upper():8} {issue.category:24} {key_part}{issue.message}")
+            lines.append(
+                f"  {severity_icon} {issue.severity.upper():8} {issue.category:24} {key_part}{issue.message}"
+            )
             if issue.suggestion and verbose:
                 lines.append(f"           → {issue.suggestion}")
 
@@ -524,6 +605,8 @@ def format_audit_report(results: list[SecurityAuditResult], *, verbose: bool = F
         lines.append("  ── Summary ──")
         lines.append(f"  {status}  {len(results)} file(s)  {total_issues} issue(s)")
         if total_critical or total_high:
-            lines.append(f"  🔴 Critical: {total_critical}  🟠 High: {total_high}  🟡 Medium: {sum(r.medium_count for r in results)}  🔵 Low: {sum(r.low_count for r in results)}")
+            lines.append(
+                f"  🔴 Critical: {total_critical}  🟠 High: {total_high}  🟡 Medium: {sum(r.medium_count for r in results)}  🔵 Low: {sum(r.low_count for r in results)}"
+            )
 
     return "\n".join(lines)
