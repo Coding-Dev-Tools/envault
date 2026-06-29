@@ -493,6 +493,11 @@ class TestCreateHandler:
 class TestServeCLI:
     """Test the 'serve' typer command (without actually starting the server)."""
 
+    @staticmethod
+    def _strip_ansi(text: str) -> str:
+        import re
+        return re.sub(r'\x1b\[[0-9;]*m', '', text)
+
     def test_serve_help(self):
         """serve --help should show endpoint descriptions."""
         from typer.testing import CliRunner
@@ -502,8 +507,9 @@ class TestServeCLI:
         runner = CliRunner()
         result = runner.invoke(app, ["serve", "--help"])
         assert result.exit_code == 0
-        assert "port" in result.stdout.lower()
-        assert "health" in result.stdout.lower() or "secrets" in result.stdout.lower()
+        clean = self._strip_ansi(result.stdout).lower()
+        assert "port" in clean
+        assert "health" in clean or "secrets" in clean
 
     def test_serve_help_shows_api_key_option(self):
         """serve --help should show the --api-key option."""
@@ -514,7 +520,8 @@ class TestServeCLI:
         runner = CliRunner()
         result = runner.invoke(app, ["serve", "--help"])
         assert result.exit_code == 0
-        assert "api-key" in result.stdout.lower()
+        clean = self._strip_ansi(result.stdout).lower()
+        assert "api-key" in clean
 
     def test_serve_help_shows_default_host_localhost(self):
         """serve --help should show default host as 127.0.0.1."""
@@ -525,7 +532,8 @@ class TestServeCLI:
         runner = CliRunner()
         result = runner.invoke(app, ["serve", "--help"])
         assert result.exit_code == 0
-        assert "127.0.0.1" in result.stdout
+        clean = self._strip_ansi(result.stdout)
+        assert "127.0.0.1" in clean
 
     def test_serve_no_encrypt_key_exits(self, tmp_path):
         """serve without any encryption key should exit with error."""
