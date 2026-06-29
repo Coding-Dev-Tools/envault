@@ -139,12 +139,16 @@ def format_history(history: EnvFileHistory, *, verbose: bool = False) -> str:
         lines.append(f"No git history found for {history.file_path}")
         return "\n".join(lines)
 
-    lines.append(f"Change history for {history.file_path} ({history.total_changes} changes)")
+    lines.append(
+        f"Change history for {history.file_path} ({history.total_changes} changes)"
+    )
     lines.append("")
 
     for change in history.changes:
         short_commit = change.commit[:7]
-        action_symbol = {"added": "+", "removed": "-", "changed": "~"}.get(change.action, "?")
+        action_symbol = {"added": "+", "removed": "-", "changed": "~"}.get(
+            change.action, "?"
+        )
         lines.append(f"  {action_symbol} {change.key}  ({change.action})")
 
         if verbose:
@@ -181,7 +185,14 @@ def _get_commits_for_file(file_path: Path, *, max_commits: int = 50) -> list[str
     """Return a list of commit hashes that touched the given file, newest first."""
     try:
         result = subprocess.run(
-            ["git", "log", f"--max-count={max_commits}", "--format=%H", "--", str(file_path)],
+            [
+                "git",
+                "log",
+                f"--max-count={max_commits}",
+                "--format=%H",
+                "--",
+                str(file_path),
+            ],
             capture_output=True,
             text=True,
             cwd=file_path.parent if file_path.parent.exists() else ".",
@@ -189,7 +200,9 @@ def _get_commits_for_file(file_path: Path, *, max_commits: int = 50) -> list[str
         )
         if result.returncode != 0:
             return []
-        return [line.strip() for line in result.stdout.strip().splitlines() if line.strip()]
+        return [
+            line.strip() for line in result.stdout.strip().splitlines() if line.strip()
+        ]
     except (subprocess.TimeoutExpired, FileNotFoundError):
         return []
 
@@ -223,43 +236,49 @@ def _diff_at_commit(
 
     # Added keys
     for key in sorted(new_keys - old_keys):
-        changes.append(EnvChange(
-            commit=commit,
-            author=meta["author"],
-            date=meta["date"],
-            message=meta["message"],
-            key=key,
-            action="added",
-            old_value=None,
-            new_value=new_vars[key],
-        ))
-
-    # Removed keys
-    for key in sorted(old_keys - new_keys):
-        changes.append(EnvChange(
-            commit=commit,
-            author=meta["author"],
-            date=meta["date"],
-            message=meta["message"],
-            key=key,
-            action="removed",
-            old_value=old_vars[key],
-            new_value=None,
-        ))
-
-    # Changed values
-    for key in sorted(old_keys & new_keys):
-        if old_vars[key] != new_vars[key]:
-            changes.append(EnvChange(
+        changes.append(
+            EnvChange(
                 commit=commit,
                 author=meta["author"],
                 date=meta["date"],
                 message=meta["message"],
                 key=key,
-                action="changed",
-                old_value=old_vars[key],
+                action="added",
+                old_value=None,
                 new_value=new_vars[key],
-            ))
+            )
+        )
+
+    # Removed keys
+    for key in sorted(old_keys - new_keys):
+        changes.append(
+            EnvChange(
+                commit=commit,
+                author=meta["author"],
+                date=meta["date"],
+                message=meta["message"],
+                key=key,
+                action="removed",
+                old_value=old_vars[key],
+                new_value=None,
+            )
+        )
+
+    # Changed values
+    for key in sorted(old_keys & new_keys):
+        if old_vars[key] != new_vars[key]:
+            changes.append(
+                EnvChange(
+                    commit=commit,
+                    author=meta["author"],
+                    date=meta["date"],
+                    message=meta["message"],
+                    key=key,
+                    action="changed",
+                    old_value=old_vars[key],
+                    new_value=new_vars[key],
+                )
+            )
 
     return changes
 
@@ -367,6 +386,10 @@ def _parse_env_content(content: str) -> dict[str, str]:
 
 def _mask_value(value: str, max_show: int = 8) -> str:
     """Mask sensitive values, showing only first few chars if they look like secrets."""
-    if len(value) > 16 and not value.startswith("/") and not value.replace(".", "").replace("-", "").isdigit():
+    if (
+        len(value) > 16
+        and not value.startswith("/")
+        and not value.replace(".", "").replace("-", "").isdigit()
+    ):
         return value[:max_show] + "..." + value[-4:]
     return value
