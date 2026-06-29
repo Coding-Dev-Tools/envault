@@ -12,9 +12,13 @@ class SecretStoreConfig(BaseModel):
     """Configuration for a secret store integration."""
 
     type: str = Field(description="Store type: aws-ssm, vault, doppler, onepassword")
-    path_prefix: str = Field(default="", description="Path/prefix for secrets in the store")
+    path_prefix: str = Field(
+        default="", description="Path/prefix for secrets in the store"
+    )
     auth_method: str = Field(default="env", description="Auth method: env, token, file")
-    token_env_var: str = Field(default="", description="Env var name containing auth token")
+    token_env_var: str = Field(
+        default="", description="Env var name containing auth token"
+    )
     url: str = Field(default="", description="Store URL (for vault)")
 
 
@@ -33,15 +37,19 @@ class EnvaultConfig(BaseModel):
     project: str = Field(default="", description="Project name")
     version: str = Field(default="1", description="Config version")
 
-    environments: list[EnvironmentConfig] = Field(default_factory=lambda: [
-        EnvironmentConfig(name="dev", env_file=".env.dev"),
-        EnvironmentConfig(name="staging", env_file=".env.staging"),
-        EnvironmentConfig(name="prod", env_file=".env.prod"),
-    ])
+    environments: list[EnvironmentConfig] = Field(
+        default_factory=lambda: [
+            EnvironmentConfig(name="dev", env_file=".env.dev"),
+            EnvironmentConfig(name="staging", env_file=".env.staging"),
+            EnvironmentConfig(name="prod", env_file=".env.prod"),
+        ]
+    )
 
     stores: dict[str, SecretStoreConfig] = Field(default_factory=dict)
     audit_log_path: str = Field(default=".envault-audit.log")
-    gitignore_patterns: list[str] = Field(default_factory=lambda: [".envault-audit.log"])
+    gitignore_patterns: list[str] = Field(
+        default_factory=lambda: [".envault-audit.log"]
+    )
 
     @classmethod
     def load(cls, path: str | Path = ".envault.yml") -> EnvaultConfig:
@@ -62,7 +70,12 @@ class EnvaultConfig(BaseModel):
         """Save config to a .envault.yml file."""
         path = Path(path)
         with open(path, "w") as f:
-            yaml.dump(self.model_dump(exclude_none=True), f, default_flow_style=False, sort_keys=False)
+            yaml.dump(
+                self.model_dump(exclude_none=True),
+                f,
+                default_flow_style=False,
+                sort_keys=False,
+            )
 
     def get_env_path(self, env_name: str) -> Path:
         """Get the path to the .env file for a given environment name."""
