@@ -13,6 +13,7 @@ jobs:
     permissions:
       contents: read
     strategy:
+      fail-fast: false
       matrix:
         python-version: ["3.11", "3.12", "3.13"]
 
@@ -36,7 +37,20 @@ jobs:
 
       - name: Run tests
         run: |
-          python -m pytest tests/ -v --tb=short
+          python -m pytest tests/ -v --tb=long 2>&1 | tee /tmp/pytest-output.txt
+          exit ${PIPESTATUS[0]}
+
+      - name: Show test output on failure
+        if: failure()
+        run: |
+          echo "=== Python version ==="
+          python --version
+          echo "=== Ruff version ==="
+          python -m ruff --version
+          echo "=== Installed packages ==="
+          pip list
+          echo "=== Last 200 lines of test output ==="
+          tail -200 /tmp/pytest-output.txt || true
 
       - name: Check CLI works
         run: |
