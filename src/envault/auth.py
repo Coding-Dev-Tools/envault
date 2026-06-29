@@ -57,7 +57,7 @@ class BearerAuth:
         if not auth_header.startswith("Bearer "):
             return AuthResult.fail(401, "Unauthorized: Bearer token required")
 
-        token = auth_header[len("Bearer "):]
+        token = auth_header[len("Bearer ") :]
         if token != self._token:
             return AuthResult.fail(403, "Forbidden: invalid token")
 
@@ -80,7 +80,9 @@ class ApiKeyAuth:
     def check(self, headers: dict[str, str]) -> AuthResult:
         api_key = headers.get("X-Api-Key", "") or headers.get("X-API-KEY", "")
         if not api_key:
-            return AuthResult.fail(401, "Unauthorized: API key required (X-API-Key header)")
+            return AuthResult.fail(
+                401, "Unauthorized: API key required (X-API-Key header)"
+            )
 
         if api_key not in self._keys:
             return AuthResult.fail(403, "Forbidden: invalid API key")
@@ -124,9 +126,11 @@ class OAuth2Auth:
     def check(self, headers: dict[str, str]) -> AuthResult:
         auth_header = headers.get("Authorization", "")
         if not auth_header.startswith("Bearer "):
-            return AuthResult.fail(401, "Unauthorized: Bearer token required for OAuth2")
+            return AuthResult.fail(
+                401, "Unauthorized: Bearer token required for OAuth2"
+            )
 
-        token = auth_header[len("Bearer "):]
+        token = auth_header[len("Bearer ") :]
 
         # Check cache first
         cached = self._cache.get(token)
@@ -191,7 +195,9 @@ class OAuth2Auth:
             required = set(self._required_scope.split())
             if not required.issubset(token_scopes):
                 missing = required - token_scopes
-                return AuthResult.fail(403, f"Forbidden: missing scope(s): {', '.join(sorted(missing))}")
+                return AuthResult.fail(
+                    403, f"Forbidden: missing scope(s): {', '.join(sorted(missing))}"
+                )
 
         # Audience check
         if self._required_audience:
@@ -201,7 +207,12 @@ class OAuth2Auth:
             if self._required_audience not in audiences:
                 return AuthResult.fail(403, "Forbidden: invalid audience")
 
-        identity = claims.get("sub") or claims.get("email") or claims.get("client_id") or "oauth2:user"
+        identity = (
+            claims.get("sub")
+            or claims.get("email")
+            or claims.get("client_id")
+            or "oauth2:user"
+        )
 
         # Cache the successful result
         self._cache[token] = (identity, time.monotonic() + self._cache_ttl)
@@ -215,7 +226,9 @@ class MultiAuth:
     If no backend is configured, all requests are allowed (open mode).
     """
 
-    def __init__(self, backends: list[BearerAuth | ApiKeyAuth | OAuth2Auth] | None = None) -> None:
+    def __init__(
+        self, backends: list[BearerAuth | ApiKeyAuth | OAuth2Auth] | None = None
+    ) -> None:
         self._backends = backends or []
 
     @property
