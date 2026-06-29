@@ -12,9 +12,8 @@ license = "MIT"
 authors = [{name = "Revenue Holdings"}]
 keywords = ["env", "secrets", "cli", "dotenv", "vault", "aws-ssm", "secret-rotation"]
 classifiers = [
- "Development Status :: 4 - Beta",
- "License :: OSI Approved :: MIT License",
- "Intended Audience :: Developers",
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
     "Environment :: Console",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
