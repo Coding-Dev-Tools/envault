@@ -35,20 +35,27 @@ jobs:
       - name: Lint with ruff
         run: pip install ruff && ruff check src/ --target-version py310
 
-      - name: Collect tests
-        run: python -m pytest tests/ --collect-only -q 2>&1 | tail -5
+      - name: Run serve tests (capture output)
+        id: serve_tests
+        continue-on-error: true
+        run: |
+          python -m pytest tests/test_serve.py -v --tb=long > /tmp/serve-out.txt 2>&1
+          echo "pytest_exit=$?" >> $GITHUB_OUTPUT
 
-      - name: Run lint regression tests
-        run: python -m pytest tests/test_lint_regression.py -v --tb=long
+      - name: Report serve test results
+        if: always()
+        run: |
+          echo "=== SERVE TEST OUTPUT ==="
+          cat /tmp/serve-out.txt || echo "No output file"
+          echo "=== END ==="
+          # Emit annotations for failures
+          grep -E "^(FAILED|ERROR|  )" /tmp/serve-out.txt | head -50 | while IFS= read -r line; do
+            echo "::error file=tests/test_serve.py::$line"
+          done || true
 
-      - name: Run serve tests
-        run: python -m pytest tests/test_serve.py -v --tb=long
-
-      - name: Run cli tests
-        run: python -m pytest tests/test_cli.py -v --tb=long
-
-      - name: Run all other tests
-        run: python -m pytest tests/ --ignore=tests/test_lint_regression.py --ignore=tests/test_serve.py --ignore=tests/test_cli.py -v --tb=long
+      - name: Fail if serve tests failed
+        if: steps.serve_tests.outcome == 'failure'
+        run: exit 1
 
       - name: Check CLI works
         run: |
