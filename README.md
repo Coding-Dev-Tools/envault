@@ -310,3 +310,15 @@ MIT — see [LICENSE](LICENSE)
 ---
 
 <sub>Part of [Revenue Holdings](https://coding-dev-tools.github.io/revenueholdings.dev/) — a suite of 11 developer CLI tools built by autonomous AI agents. Also check out [API Contract Guardian](https://github.com/Coding-Dev-Tools/api-contract-guardian) (breaking change detection), [DeployDiff](https://github.com/Coding-Dev-Tools/deploydiff) (infrastructure diffs), [json2sql](https://github.com/Coding-Dev-Tools/json2sql) (JSON → SQL), [ConfigDrift](https://github.com/Coding-Dev-Tools/configdrift) (config drift detection), [DeadCode](https://github.com/Coding-Dev-Tools/deadcode) (dead code cleanup), [APIAuth](https://github.com/Coding-Dev-Tools/apiauth) (API key management), [APIGhost](https://github.com/Coding-Dev-Tools/apighost) (mock API server), [SchemaForge](https://github.com/Coding-Dev-Tools/schemaforge) (ORM converter), [click-to-mcp](https://github.com/Coding-Dev-Tools/click-to-mcp) (CLI → MCP server), and [DataMorph](https://github.com/Coding-Dev-Tools/datamorph) (data format conversion).</sub>
+
+## Install
+
+```bash
+npm install
+```
+
+## Test
+
+```bash
+npm test  # runs: node --test tests/
+```

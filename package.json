@@ -1,45 +1,54 @@
 {
-  "name": "rh-envault",
-  "version": "0.1.0",
-  "description": "Secure environment variable manager for development teams. Encrypt, store, and share .env files.",
-  "author": "Revenue Holdings <engineering@revenueholdings.dev>",
-  "license": "MIT",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/Coding-Dev-Tools/envault.git"
-  },
-  "homepage": "https://github.com/Coding-Dev-Tools/envault#readme",
-  "bugs": {
-    "url": "https://github.com/Coding-Dev-Tools/envault/issues"
-  },
-  "bin": {
-    "envault": "cli.js"
-  },
-  "keywords": [
-    "env",
-    "dotenv",
-    "secrets",
-    "vault",
-    "encryption",
-    "cli",
-    "environment-variables",
-    "secret-rotation",
-    "security",
-    "key-management",
-    "credentials",
-    "env-file",
-    "aes-encryption",
-    "devops",
-    "developer-tools"
-  ],
-  "files": [
-    "cli.js"
-  ],
-  "engines": {
-    "node": ">=16.0.0"
-  },
-  "preferGlobal": true,
-  "publishConfig": {
-    "access": "public"
-  }
+    "name":  "rh-envault",
+    "version":  "0.1.0",
+    "description":  "Secure environment variable manager for development teams. Encrypt, store, and share .env files.",
+    "author":  "Revenue Holdings \u003cengineering@revenueholdings.dev\u003e",
+    "license":  "MIT",
+    "repository":  {
+                       "type":  "git",
+                       "url":  "https://github.com/Coding-Dev-Tools/envault.git"
+                   },
+    "homepage":  "https://github.com/Coding-Dev-Tools/envault#readme",
+    "bugs":  {
+                 "url":  "https://github.com/Coding-Dev-Tools/envault/issues"
+             },
+    "bin":  {
+                "envault":  "cli.js"
+            },
+    "keywords":  [
+                     "env",
+                     "dotenv",
+                     "secrets",
+                     "vault",
+                     "encryption",
+                     "cli",
+                     "environment-variables",
+                     "secret-rotation",
+                     "security",
+                     "key-management",
+                     "credentials",
+                     "env-file",
+                     "aes-encryption",
+                     "devops",
+                     "developer-tools"
+                 ],
+    "files":  [
+                  "cli.js"
+              ],
+    "engines":  {
+                    "node":  "\u003e=16.0.0"
+                },
+    "preferGlobal":  true,
+    "publishConfig":  {
+                          "access":  "public"
+                      },
+    "scripts":  {
+                    "test":  "node --test tests/*.test.js",
+                    "lint":  "eslint .",
+                    "test:py":  "pytest"
+                },
+    "devDependencies":  {
+                            "@eslint/js":  "^9.0.0",
+                            "eslint":  "^9.0.0"
+                        }
 }

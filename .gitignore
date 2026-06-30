@@ -44,3 +44,6 @@ htmlcov/
 *.REMOTE.*
 local.db
 *.sqlite3
+
+# Added by release-prep
+node_modules
