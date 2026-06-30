@@ -5,9 +5,11 @@ Issue: COM-238
 """
 
 import base64
+
+from typer.testing import CliRunner
+
 from envault.cli import app
 from envault.encrypt import decrypt_env, encrypt_env, is_encrypted
-from typer.testing import CliRunner
 
 # ── Test Data ──────────────────────────────────────────────────────────────
 

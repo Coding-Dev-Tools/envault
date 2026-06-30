@@ -12,9 +12,9 @@ Covers uncovered error-handling paths:
 from __future__ import annotations
 
 import sys
-import yaml
-
 from pathlib import Path
+
+import yaml
 from typer.testing import CliRunner
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))

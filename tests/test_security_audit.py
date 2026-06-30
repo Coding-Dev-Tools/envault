@@ -1,6 +1,7 @@
 """Tests for security_audit module — envault audit-security command."""
 
 import stat
+
 from envault.security_audit import (
     SecurityAuditResult,
     SecurityIssue,

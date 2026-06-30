@@ -1,8 +1,10 @@
 """Standalone test to reproduce COM-367 behavior."""
 import tempfile
-from envault.cli import app
 from pathlib import Path
+
 from typer.testing import CliRunner
+
+from envault.cli import app
 
 
 def test_scan_hardcoded_credential_repro():

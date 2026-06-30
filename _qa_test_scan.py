@@ -1,8 +1,11 @@
 """QA verification script for COM-367."""
+import json as _json
 import os
 import tempfile
-from envault.cli import app
+
 from typer.testing import CliRunner
+
+from envault.cli import app
 
 runner = CliRunner()
 
@@ -32,7 +35,6 @@ with tempfile.TemporaryDirectory() as td:
 
 # Test 3: JSON output with Rich control chars
 print("=== Root Cause 3: JSON output control chars ===")
-import json as _json
 
 with tempfile.TemporaryDirectory() as td:
     env_file = os.path.join(td, ".env")

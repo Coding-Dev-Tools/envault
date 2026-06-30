@@ -6,6 +6,7 @@ Tests: multiline SSH keys, base64, JSON blobs, unicode, PEM certs,
 
 import json
 import os
+
 from envault.encrypt import decrypt_env, encrypt_env
 
 PASSWORD = "test-password-for-qa"
