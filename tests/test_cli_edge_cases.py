@@ -26,9 +26,7 @@ def _make_config(tmp_path, env_map):
     """Create minimal .envault.yml with list-formatted environments."""
     config = {
         "project": "test",
-        "environments": [
-            {"name": name, "env_file": path} for name, path in env_map.items()
-        ],
+        "environments": [{"name": name, "env_file": path} for name, path in env_map.items()],
     }
     config_path = tmp_path / ".envault.yml"
     with open(config_path, "w") as f:
@@ -167,9 +165,7 @@ class TestPackagingQuality:
         with open(pyproject, "rb") as f:
             data = tomllib.load(f)
         pkg_data = data.get("tool", {}).get("setuptools", {}).get("package-data", {})
-        assert "envault" in pkg_data, (
-            "Expected [tool.setuptools.package-data] section for 'envault'"
-        )
+        assert "envault" in pkg_data, "Expected [tool.setuptools.package-data] section for 'envault'"
         assert "py.typed" in pkg_data["envault"], (
             f"Expected 'py.typed' in package-data for envault, got {pkg_data['envault']}"
         )
@@ -181,8 +177,6 @@ class TestPackagingQuality:
         pyproject = Path(__file__).parent.parent / "pyproject.toml"
         with open(pyproject, "rb") as f:
             data = tomllib.load(f)
-        isort_cfg = (
-            data.get("tool", {}).get("ruff", {}).get("lint", {}).get("isort", {})
-        )
+        isort_cfg = data.get("tool", {}).get("ruff", {}).get("lint", {}).get("isort", {})
         kfp = isort_cfg.get("known-first-party", [])
         assert kfp == ["envault"], f"known-first-party should be ['envault'], got {kfp}"

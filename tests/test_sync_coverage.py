@@ -136,9 +136,7 @@ def test_sync_envs_skip_keys_on_add_and_delete():
     """skip_keys works simultaneously for add and delete branches."""
     source = {"A": "1"}
     target = {"A": "1", "SKIP_DEL": "x"}
-    result = sync_envs(
-        source, target, allow_delete=True, skip_keys={"SKIP_ADD", "SKIP_DEL"}
-    )
+    result = sync_envs(source, target, allow_delete=True, skip_keys={"SKIP_ADD", "SKIP_DEL"})
     # SKIP_DEL is in target but not source — should be skipped, not deleted
     assert "SKIP_DEL" in result.skipped
     assert "SKIP_DEL" not in result.deleted

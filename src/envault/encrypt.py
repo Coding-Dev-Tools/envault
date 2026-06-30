@@ -132,10 +132,7 @@ def decrypt_env(
 
     salt_path = input_path.parent / SALT_FILE
     if not salt_path.exists():
-        raise FileNotFoundError(
-            f"Salt file not found: {salt_path}. "
-            "Cannot decrypt without the original salt."
-        )
+        raise FileNotFoundError(f"Salt file not found: {salt_path}. Cannot decrypt without the original salt.")
 
     salt = salt_path.read_bytes()
     key = _derive_key(password, salt)

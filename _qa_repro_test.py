@@ -1,4 +1,5 @@
 """Standalone test to reproduce COM-367 behavior."""
+
 import tempfile
 from pathlib import Path
 
@@ -36,6 +37,7 @@ def test_scan_weak_password_repro():
 def test_scan_json_output_repro():
     """Exact reproduction of test_scan_json_output."""
     import json as _json
+
     runner = CliRunner()
     td = Path(tempfile.mkdtemp())
     env_file = td / ".env"

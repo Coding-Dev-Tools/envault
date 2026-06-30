@@ -14,19 +14,13 @@ def load_env_file(path: str | Path) -> dict[str, str]:
     path = Path(path)
     if not path.exists():
         raise FileNotFoundError(f"Env file not found: {path}")
-    return {
-        k: v for k, v in dotenv_values(path).items() if k is not None and v is not None
-    }
+    return {k: v for k, v in dotenv_values(path).items() if k is not None and v is not None}
 
 
 def load_env_content(content: str) -> dict[str, str]:
     """Load environment variables from a string content."""
     stream = io.StringIO(content)
-    return {
-        k: v
-        for k, v in dotenv_values(stream=stream).items()
-        if k is not None and v is not None
-    }
+    return {k: v for k, v in dotenv_values(stream=stream).items() if k is not None and v is not None}
 
 
 class EnvDiffResult:
@@ -202,10 +196,6 @@ def _mask_value(value: str, max_show: int = 8) -> str:
     """Mask sensitive values, showing only first few chars if they look like secrets."""
     # Heuristic: if it looks like a key/secret/token, mask it
     # Value is long and not obviously a path or number — likely a secret
-    if (
-        len(value) > 16
-        and not value.startswith("/")
-        and not value.replace(".", "").replace("-", "").isdigit()
-    ):
+    if len(value) > 16 and not value.startswith("/") and not value.replace(".", "").replace("-", "").isdigit():
         return value[:max_show] + "..." + value[-4:]
     return value

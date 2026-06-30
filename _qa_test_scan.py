@@ -1,4 +1,5 @@
 """QA verification script for COM-367."""
+
 import json as _json
 import os
 import tempfile

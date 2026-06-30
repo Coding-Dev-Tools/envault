@@ -15,9 +15,7 @@ class SyncConflict(Exception):
         self.key = key
         self.source_value = source_value
         self.target_value = target_value
-        super().__init__(
-            f"Conflict on '{key}': source='{source_value[:20]}...' vs target='{target_value[:20]}...'"
-        )
+        super().__init__(f"Conflict on '{key}': source='{source_value[:20]}...' vs target='{target_value[:20]}...'")
 
 
 class SyncResult:
@@ -173,9 +171,7 @@ def sync_env_files(
         write_env_file(target_path, target)
         if audit:
             for k in result.added:
-                audit.log(
-                    "add", k, source_path=str(source_path), target_path=str(target_path)
-                )
+                audit.log("add", k, source_path=str(source_path), target_path=str(target_path))
             for k in result.updated:
                 audit.log(
                     "update",

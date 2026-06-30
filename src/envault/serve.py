@@ -84,11 +84,7 @@ class SecretHandler(BaseHTTPRequestHandler):
             self._send_error(401, "Unauthorized: valid Bearer token required")
             return False
 
-        token = (
-            auth_header[len("Bearer ") :]
-            if auth_header.startswith("Bearer ")
-            else auth_header
-        )
+        token = auth_header[len("Bearer ") :] if auth_header.startswith("Bearer ") else auth_header
         if not token or not token.strip():
             self._send_error(401, "Unauthorized: valid Bearer token required")
             return False
@@ -189,9 +185,7 @@ class SecretHandler(BaseHTTPRequestHandler):
                 with urlopen(req, timeout=5) as resp:  # noqa: S310
                     if resp.status != 200:
                         _oauth2_cache[token] = (False, time.monotonic() + 60)
-                        self._send_error(
-                            401, "Unauthorized: token introspection failed"
-                        )
+                        self._send_error(401, "Unauthorized: token introspection failed")
                         return False
                     result = json.loads(resp.read().decode("utf-8"))
             except (URLError, OSError, json.JSONDecodeError) as exc:
@@ -253,9 +247,7 @@ class SecretHandler(BaseHTTPRequestHandler):
                 with urlopen(req, timeout=5) as resp:  # noqa: S310
                     if resp.status != 200:
                         _oauth2_cache[token] = (False, time.monotonic() + 60)
-                        self._send_error(
-                            401, "Unauthorized: token rejected by provider"
-                        )
+                        self._send_error(401, "Unauthorized: token rejected by provider")
                         return False
             except (URLError, OSError) as exc:
                 self._send_error(502, f"OAuth2 userinfo error: {exc}")
@@ -281,12 +273,7 @@ class SecretHandler(BaseHTTPRequestHandler):
         Sends a 401/403 and returns False if authentication fails.
         """
         # If no auth credentials are configured at all, skip auth
-        has_any_auth = (
-            self.api_token
-            or self.api_key
-            or self.oauth_introspect_url
-            or self.oauth_userinfo_url
-        )
+        has_any_auth = self.api_token or self.api_key or self.oauth_introspect_url or self.oauth_userinfo_url
         if not has_any_auth:
             return True
 
@@ -378,9 +365,7 @@ class SecretHandler(BaseHTTPRequestHandler):
             except Exception as exc:
                 checks[store_type] = {"status": "error", "detail": str(exc)}
 
-        overall = (
-            "ok" if all(c.get("status") == "ok" for c in checks.values()) else "error"
-        )
+        overall = "ok" if all(c.get("status") == "ok" for c in checks.values()) else "error"
         self._send_json({"status": overall, "checks": checks})
 
     def _handle_auth_info(self) -> None:
@@ -405,10 +390,7 @@ class SecretHandler(BaseHTTPRequestHandler):
                 "auth_mode": self.auth_mode,
                 "methods": methods,
                 "requires_auth": bool(
-                    self.api_token
-                    or self.api_key
-                    or self.oauth_introspect_url
-                    or self.oauth_userinfo_url
+                    self.api_token or self.api_key or self.oauth_introspect_url or self.oauth_userinfo_url
                 ),
             }
         )
@@ -543,9 +525,7 @@ def run_server(
     if encrypt_key is None:
         encrypt_key = _get_encrypt_key()
         if not encrypt_key:
-            raise SystemExit(
-                "Error: encryption key required (set ENVAULT_ENCRYPT_KEY or provide --password)"
-            )
+            raise SystemExit("Error: encryption key required (set ENVAULT_ENCRYPT_KEY or provide --password)")
 
     # Resolve API token for Bearer auth
     if api_token is None:
@@ -573,9 +553,7 @@ def run_server(
     # Validate auth_mode
     valid_modes = ("bearer", "api-key", "oauth2", "any")
     if auth_mode not in valid_modes:
-        raise SystemExit(
-            f"Error: invalid auth mode '{auth_mode}'. Choose from: {', '.join(valid_modes)}"
-        )
+        raise SystemExit(f"Error: invalid auth mode '{auth_mode}'. Choose from: {', '.join(valid_modes)}")
 
     # For oauth2 mode, at least one OAuth2 endpoint is required
     if auth_mode == "oauth2" and not oauth_introspect_url and not oauth_userinfo_url:
@@ -605,9 +583,7 @@ def run_server(
     else:
         store_instance = get_store("")
 
-    handler_class = create_handler(
-        store_instance, config, encrypt_key, resolved_api_key
-    )
+    handler_class = create_handler(store_instance, config, encrypt_key, resolved_api_key)
     server = HTTPServer((host, port), handler_class)
 
     from rich.console import Console
@@ -619,16 +595,10 @@ def run_server(
     console.print(" GET /secrets/{key} — get decrypted value")
     console.print(" GET /health — store connectivity check")
     if resolved_api_key:
-        console.print(
-            "[green]🔒[/green] API authentication enabled (Bearer token required)"
-        )
+        console.print("[green]🔒[/green] API authentication enabled (Bearer token required)")
     else:
-        console.print(
-            "[yellow]⚠[/yellow] No API key set — secrets endpoints are unauthenticated!"
-        )
-        console.print(
-            "[dim]   Set --api-key flag or ENVAULT_API_KEY env var to enable auth[/dim]"
-        )
+        console.print("[yellow]⚠[/yellow] No API key set — secrets endpoints are unauthenticated!")
+        console.print("[dim]   Set --api-key flag or ENVAULT_API_KEY env var to enable auth[/dim]")
 
     console.print("[dim]Press Ctrl+C to stop[/dim]")
 

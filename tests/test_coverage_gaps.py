@@ -41,9 +41,7 @@ def test_audit_log_with_target_path(tmp_path):
 def test_audit_log_with_details(tmp_path):
     """log() with details dict should include 'details' key in entry."""
     log = AuditLogger(str(tmp_path / "audit.log"))
-    log.log(
-        "rotate", "API_KEY", details={"strategy": "source_wins", "old_prefix": "sk_"}
-    )
+    log.log("rotate", "API_KEY", details={"strategy": "source_wins", "old_prefix": "sk_"})
     history = log.get_history()
     assert len(history) == 1
     assert history[0]["details"]["strategy"] == "source_wins"
@@ -66,9 +64,7 @@ def test_audit_log_malformed_line(tmp_path):
     """get_history skips lines that are not valid JSON."""
     log_path = tmp_path / "audit.log"
     # Write a mix of valid and invalid lines
-    log_path.write_text(
-        '{"action":"add","key":"K1"}\nnot-json\n{"action":"add","key":"K2"}\n'
-    )
+    log_path.write_text('{"action":"add","key":"K1"}\nnot-json\n{"action":"add","key":"K2"}\n')
     log = AuditLogger(str(log_path))
     history = log.get_history()
     assert len(history) == 2  # Only the valid JSON lines
@@ -242,9 +238,7 @@ def test_rotate_env_var_dry_run_with_audit(tmp_path):
     audit_log = str(tmp_path / "audit.log")
     audit = AuditLogger(audit_log)
 
-    success, new_val = rotate_env_var(
-        "DB_PASSWORD", str(env_file), dry_run=True, audit=audit
-    )
+    success, new_val = rotate_env_var("DB_PASSWORD", str(env_file), dry_run=True, audit=audit)
     assert success
     assert new_val != "oldpass"
     # Dry run should NOT log audit
@@ -325,9 +319,7 @@ def test_to_json_custom_labels():
     result = diff_envs({"K": "old"}, {"K": "new"})
     import json
 
-    parsed = json.loads(
-        result.to_json(source_label="staging", target_label="production")
-    )
+    parsed = json.loads(result.to_json(source_label="staging", target_label="production"))
     assert "staging" in parsed["different"]["K"]
     assert "production" in parsed["different"]["K"]
 
