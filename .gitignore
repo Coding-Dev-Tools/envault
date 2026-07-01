@@ -22,6 +22,12 @@ Thumbs.db
 # Envault
 .envault-audit.log
 .envault.salt
+.env
+
+# QA/temp run artifacts
+_qa*
+qa_*
+test-file.txt
 .env.dev
 .env.staging
 .env.prod
