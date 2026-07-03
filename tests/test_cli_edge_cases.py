@@ -11,10 +11,15 @@ Covers uncovered error-handling paths:
 
 from __future__ import annotations
 
-import sys
-import yaml
+try:
+    import tomllib  # Python 3.11+
+except ModuleNotFoundError:  # Python 3.10
+    import tomli as tomllib
 
+import sys
 from pathlib import Path
+
+import yaml
 from typer.testing import CliRunner
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
@@ -161,7 +166,6 @@ class TestPackagingQuality:
 
     def test_package_data_includes_py_typed(self):
         """pyproject.toml should have package-data config for py.typed."""
-        import tomllib
 
         pyproject = Path(__file__).parent.parent / "pyproject.toml"
         with open(pyproject, "rb") as f:
@@ -176,7 +180,6 @@ class TestPackagingQuality:
 
     def test_ruff_known_first_party(self):
         """ruff known-first-party should be ['envault'], not ['*']."""
-        import tomllib
 
         pyproject = Path(__file__).parent.parent / "pyproject.toml"
         with open(pyproject, "rb") as f:
