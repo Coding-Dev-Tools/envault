@@ -33,7 +33,7 @@ from envault.encrypt import KEY_ENV_VAR
 from envault.stores import LocalEnvStore, SecretStore, get_store
 
 # Environment variable for API authentication key
-API_KEY_ENV_VAR = "ENVAULT_API_KEY"
+API_KEY_ENV_VAR = "ENVAULT_API_KEY"  # pragma: allowlist secret
 
 _OAUTH2_CACHE_TTL: float = 300.0  # seconds
 _oauth2_cache: dict[str, tuple[bool, float]] = {}
