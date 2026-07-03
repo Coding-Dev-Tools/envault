@@ -120,10 +120,7 @@ def get_env_history_multiple(
     Returns:
         List of EnvFileHistory, one per file.
     """
-    return [
-        get_env_history(fp, max_commits=max_commits, key_filter=key_filter)
-        for fp in file_paths
-    ]
+    return [get_env_history(fp, max_commits=max_commits, key_filter=key_filter) for fp in file_paths]
 
 
 def format_history(history: EnvFileHistory, *, verbose: bool = False) -> str:
@@ -139,16 +136,12 @@ def format_history(history: EnvFileHistory, *, verbose: bool = False) -> str:
         lines.append(f"No git history found for {history.file_path}")
         return "\n".join(lines)
 
-    lines.append(
-        f"Change history for {history.file_path} ({history.total_changes} changes)"
-    )
+    lines.append(f"Change history for {history.file_path} ({history.total_changes} changes)")
     lines.append("")
 
     for change in history.changes:
         short_commit = change.commit[:7]
-        action_symbol = {"added": "+", "removed": "-", "changed": "~"}.get(
-            change.action, "?"
-        )
+        action_symbol = {"added": "+", "removed": "-", "changed": "~"}.get(change.action, "?")
         lines.append(f"  {action_symbol} {change.key}  ({change.action})")
 
         if verbose:
@@ -200,9 +193,7 @@ def _get_commits_for_file(file_path: Path, *, max_commits: int = 50) -> list[str
         )
         if result.returncode != 0:
             return []
-        return [
-            line.strip() for line in result.stdout.strip().splitlines() if line.strip()
-        ]
+        return [line.strip() for line in result.stdout.strip().splitlines() if line.strip()]
     except (subprocess.TimeoutExpired, FileNotFoundError):
         return []
 
@@ -386,10 +377,6 @@ def _parse_env_content(content: str) -> dict[str, str]:
 
 def _mask_value(value: str, max_show: int = 8) -> str:
     """Mask sensitive values, showing only first few chars if they look like secrets."""
-    if (
-        len(value) > 16
-        and not value.startswith("/")
-        and not value.replace(".", "").replace("-", "").isdigit()
-    ):
+    if len(value) > 16 and not value.startswith("/") and not value.replace(".", "").replace("-", "").isdigit():
         return value[:max_show] + "..." + value[-4:]
     return value

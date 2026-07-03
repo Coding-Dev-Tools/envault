@@ -52,15 +52,9 @@ def load_config(config_path: str = "") -> EnvaultConfig:
 @app.command()
 def init(
     project_name: str = typer.Argument(..., help="Project name"),
-    config_path: str = typer.Option(
-        ".envault.yml", "--config", "-c", help="Config file path"
-    ),
-    no_example: bool = typer.Option(
-        False, "--no-example", help="Skip .env.example generation"
-    ),
-    example_file: str = typer.Option(
-        ".env.example", "--example-file", "-e", help="Output path for .env.example"
-    ),
+    config_path: str = typer.Option(".envault.yml", "--config", "-c", help="Config file path"),
+    no_example: bool = typer.Option(False, "--no-example", help="Skip .env.example generation"),
+    example_file: str = typer.Option(".env.example", "--example-file", "-e", help="Output path for .env.example"),
 ):
     """Initialize a new .envault.yml config file and generate .env.example.
 
@@ -81,24 +75,14 @@ def init(
         example_path=example_file,
         env_files=existing_env_files if existing_env_files else None,
     )
-    console.print(
-        f"[green]✓[/green] Created {config_path} for project '{project_name}'"
-    )
+    console.print(f"[green]✓[/green] Created {config_path} for project '{project_name}'")
     if not no_example:
         example_path = Path(example_file)
         if example_path.exists():
-            key_count = sum(
-                1
-                for line in example_path.read_text().splitlines()
-                if line and not line.startswith("#")
-            )
-            console.print(
-                f"[green]✓[/green] Generated {example_file} ({key_count} keys)"
-            )
+            key_count = sum(1 for line in example_path.read_text().splitlines() if line and not line.startswith("#"))
+            console.print(f"[green]✓[/green] Generated {example_file} ({key_count} keys)")
         else:
-            console.print(
-                f"[yellow]⚠[/yellow] No .env files found — {example_file} not created"
-            )
+            console.print(f"[yellow]⚠[/yellow] No .env files found — {example_file} not created")
     console.print("\nEdit the config to set up environments and secret stores.")
     console.print("Then run: envault diff, envault sync, envault rotate")
 
@@ -110,12 +94,8 @@ def init(
 def diff(
     source_env: str = typer.Argument("dev", help="Source environment"),
     target_env: str = typer.Argument("prod", help="Target environment"),
-    source_file: str | None = typer.Option(
-        None, "--source", "-s", help="Source .env file path (overrides env name)"
-    ),
-    target_file: str | None = typer.Option(
-        None, "--target", "-t", help="Target .env file path (overrides env name)"
-    ),
+    source_file: str | None = typer.Option(None, "--source", "-s", help="Source .env file path (overrides env name)"),
+    target_file: str | None = typer.Option(None, "--target", "-t", help="Target .env file path (overrides env name)"),
     config_path: str = typer.Option("", "--config", "-c", help="Config file path"),
     fail_on_missing: bool = typer.Option(
         False,
@@ -174,9 +154,7 @@ def diff_files(
         raise typer.Exit(1)
     result = diff_env_files(file1, file2)
     if json_output:
-        print(
-            result.to_json(source_label=Path(file1).name, target_label=Path(file2).name)
-        )
+        print(result.to_json(source_label=Path(file1).name, target_label=Path(file2).name))
     else:
         console.print(format_diff(result, Path(file1).name, Path(file2).name))
         if result.has_differences:
@@ -201,13 +179,9 @@ def sync(
         "-s",
         help="Conflict resolution: source_wins, target_wins, error",
     ),
-    allow_delete: bool = typer.Option(
-        False, "--allow-delete", "-d", help="Delete keys not in source"
-    ),
+    allow_delete: bool = typer.Option(False, "--allow-delete", "-d", help="Delete keys not in source"),
     skip: list[str] | None = typer.Option(None, "--skip", help="Keys to skip"),
-    dry_run: bool = typer.Option(
-        False, "--dry-run", "-n", help="Show changes without applying"
-    ),
+    dry_run: bool = typer.Option(False, "--dry-run", "-n", help="Show changes without applying"),
     config_path: str = typer.Option("", "--config", "-c", help="Config file path"),
 ):
     """Sync environment variables from source env to target env."""
@@ -241,9 +215,7 @@ def sync(
             allow_delete=allow_delete,
             skip_keys=skip_keys,
         )
-        console.print(
-            f"[yellow]Dry run[/yellow] — would sync {source_env} → {target_env}:"
-        )
+        console.print(f"[yellow]Dry run[/yellow] — would sync {source_env} → {target_env}:")
         console.print(f"  + {len(result.added)} keys to add")
         console.print(f"  ~ {len(result.updated)} keys to update")
         console.print(f"  - {len(result.deleted)} keys to delete")
@@ -268,9 +240,7 @@ def sync(
         raise typer.Exit(1)
 
     if result.success_count == 0 and not result.deleted:
-        console.print(
-            f"[green]✓[/green] {source_env} and {target_env} are already in sync"
-        )
+        console.print(f"[green]✓[/green] {source_env} and {target_env} are already in sync")
     else:
         console.print(f"[green]✓[/green] Synced {source_env} → {target_env}:")
         if result.added:
@@ -300,9 +270,7 @@ def rotate(
     key: str = typer.Argument(..., help="Environment variable name to rotate"),
     env: str = typer.Option("dev", "--env", "-e", help="Environment name"),
     length: int = typer.Option(32, "--length", "-l", help="Length of new secret"),
-    dry_run: bool = typer.Option(
-        False, "--dry-run", "-n", help="Show new value without changing file"
-    ),
+    dry_run: bool = typer.Option(False, "--dry-run", "-n", help="Show new value without changing file"),
     output: bool = typer.Option(False, "--show", help="Display the new secret value"),
     config_path: str = typer.Option("", "--config", "-c", help="Config file path"),
 ):
@@ -332,9 +300,7 @@ def rotate(
         if output:
             console.print(f"[yellow]Would rotate[/yellow] {key} → {new_value}")
         else:
-            console.print(
-                f"[yellow]Would rotate[/yellow] {key} (use --show to display)"
-            )
+            console.print(f"[yellow]Would rotate[/yellow] {key} (use --show to display)")
     else:
         console.print(f"[green]✓[/green] Rotated {key} in {env}")
         if output:
@@ -343,12 +309,8 @@ def rotate(
 
 @app.command()
 def rotate_all(
-    env: str = typer.Option(
-        "prod", "--env", "-e", help="Environment name to rotate all in"
-    ),
-    dry_run: bool = typer.Option(
-        False, "--dry-run", "-n", help="Show what would rotate"
-    ),
+    env: str = typer.Option("prod", "--env", "-e", help="Environment name to rotate all in"),
+    dry_run: bool = typer.Option(False, "--dry-run", "-n", help="Show what would rotate"),
     config_path: str = typer.Option("", "--config", "-c", help="Config file path"),
 ):
     """Rotate all variables in an environment (re-generates every value)."""
@@ -370,9 +332,7 @@ def rotate_all(
         raise typer.Exit(0)
 
     if not dry_run:
-        confirm = Confirm.ask(
-            f"Rotate all {len(vars)} variables in {env}? This cannot be undone."
-        )
+        confirm = Confirm.ask(f"Rotate all {len(vars)} variables in {env}? This cannot be undone.")
         if not confirm:
             console.print("Cancelled")
             raise typer.Exit(0)
@@ -389,9 +349,7 @@ def rotate_all(
             rotated += 1
 
     if dry_run:
-        console.print(
-            f"[yellow]Dry run:[/yellow] Would rotate {rotated} variables in {env}"
-        )
+        console.print(f"[yellow]Dry run:[/yellow] Would rotate {rotated} variables in {env}")
     else:
         console.print(f"[green]✓[/green] Rotated {rotated} variables in {env}")
 
@@ -433,9 +391,7 @@ def store_list(
 @store_app.command("get")
 def store_get(
     key: str = typer.Argument(..., help="Key to retrieve"),
-    store_name: str | None = typer.Option(
-        None, "--store", "-s", help="Store name from config"
-    ),
+    store_name: str | None = typer.Option(None, "--store", "-s", help="Store name from config"),
     config_path: str = typer.Option("", "--config", "-c", help="Config file path"),
 ):
     """Get a value from a secret store."""
@@ -458,9 +414,7 @@ def store_get(
 def store_set(
     key: str = typer.Argument(..., help="Key to set"),
     value: str = typer.Argument(..., help="Value to store"),
-    store_name: str | None = typer.Option(
-        None, "--store", "-s", help="Store name from config"
-    ),
+    store_name: str | None = typer.Option(None, "--store", "-s", help="Store name from config"),
     config_path: str = typer.Option("", "--config", "-c", help="Config file path"),
 ):
     """Set a value in a secret store."""
@@ -478,9 +432,7 @@ def store_set(
 @store_app.command("delete")
 def store_delete(
     key: str = typer.Argument(..., help="Key to delete"),
-    store_name: str | None = typer.Option(
-        None, "--store", "-s", help="Store name from config"
-    ),
+    store_name: str | None = typer.Option(None, "--store", "-s", help="Store name from config"),
     config_path: str = typer.Option("", "--config", "-c", help="Config file path"),
 ):
     """Delete a secret from a secret store."""
@@ -504,15 +456,9 @@ def store_delete(
 @app.command()
 def encrypt(
     input_file: Path = typer.Argument(..., help=".env file to encrypt", exists=True),
-    output: Path | None = typer.Option(
-        None, "--output", "-o", help="Output path (default: input.locked)"
-    ),
-    password: str | None = typer.Option(
-        None, "--password", "-p", help="Encryption password (prompted if omitted)"
-    ),
-    delete_original: bool = typer.Option(
-        False, "--delete", "-d", help="Delete original after encryption"
-    ),
+    output: Path | None = typer.Option(None, "--output", "-o", help="Output path (default: input.locked)"),
+    password: str | None = typer.Option(None, "--password", "-p", help="Encryption password (prompted if omitted)"),
+    delete_original: bool = typer.Option(False, "--delete", "-d", help="Delete original after encryption"),
 ):
     """Encrypt a .env file using Fernet symmetric encryption."""
     result = encrypt_env(
@@ -528,18 +474,10 @@ def encrypt(
 
 @app.command()
 def decrypt(
-    input_file: Path = typer.Argument(
-        ..., help=".env.locked file to decrypt", exists=True
-    ),
-    output: Path | None = typer.Option(
-        None, "--output", "-o", help="Output path (default: strips .locked)"
-    ),
-    password: str | None = typer.Option(
-        None, "--password", "-p", help="Decryption password (prompted if omitted)"
-    ),
-    delete_encrypted: bool = typer.Option(
-        False, "--delete", "-d", help="Delete encrypted file after decryption"
-    ),
+    input_file: Path = typer.Argument(..., help=".env.locked file to decrypt", exists=True),
+    output: Path | None = typer.Option(None, "--output", "-o", help="Output path (default: strips .locked)"),
+    password: str | None = typer.Option(None, "--password", "-p", help="Decryption password (prompted if omitted)"),
+    delete_encrypted: bool = typer.Option(False, "--delete", "-d", help="Delete encrypted file after decryption"),
 ):
     """Decrypt a .env.locked file."""
     result = decrypt_env(input_file, output, password, delete_encrypted)
@@ -554,9 +492,7 @@ def decrypt(
 @app.command()
 def audit(
     key: str | None = typer.Option(None, "--key", "-k", help="Filter by key"),
-    action: str | None = typer.Option(
-        None, "--action", "-a", help="Filter by action (add/update/delete/rotate)"
-    ),
+    action: str | None = typer.Option(None, "--action", "-a", help="Filter by action (add/update/delete/rotate)"),
     limit: int = typer.Option(50, "--limit", "-n", help="Number of entries to show"),
     config_path: str = typer.Option("", "--config", "-c", help="Config file path"),
 ):
@@ -576,9 +512,7 @@ def audit(
     table.add_column("Details")
 
     for entry in entries:
-        details = (
-            entry.get("source") or entry.get("target") or entry.get("env_file") or ""
-        )
+        details = entry.get("source") or entry.get("target") or entry.get("env_file") or ""
         table.add_row(
             entry.get("timestamp", "")[-23:-7],
             entry.get("action", ""),
@@ -595,16 +529,10 @@ def audit(
 @app.command()
 def scan(
     files: list[str] = typer.Argument(..., help="One or more .env files to scan"),
-    verbose: bool = typer.Option(
-        False, "--verbose", "-v", help="Show info-level findings and suggestions"
-    ),
+    verbose: bool = typer.Option(False, "--verbose", "-v", help="Show info-level findings and suggestions"),
     json_output: bool = typer.Option(False, "--json", help="Output results as JSON"),
-    no_permissions: bool = typer.Option(
-        False, "--no-permissions", help="Skip file permission checks"
-    ),
-    no_gitignore: bool = typer.Option(
-        False, "--no-gitignore", help="Skip .gitignore checks"
-    ),
+    no_permissions: bool = typer.Option(False, "--no-permissions", help="Skip file permission checks"),
+    no_gitignore: bool = typer.Option(False, "--no-gitignore", help="Skip .gitignore checks"),
     config_path: str = typer.Option("", "--config", "-c", help="Config file path"),
 ):
     """Scan .env files for security issues (weak secrets, hardcoded credentials, permissions, gitignore)."""
@@ -659,21 +587,11 @@ def scan(
 @app.command()
 def history(
     env: str = typer.Argument("dev", help="Environment name from config"),
-    file: str | None = typer.Option(
-        None, "--file", "-f", help="Direct .env file path (overrides env name)"
-    ),
-    key: str | None = typer.Option(
-        None, "--key", "-k", help="Filter changes to a specific key"
-    ),
-    max_commits: int = typer.Option(
-        50, "--max-commits", "-n", help="Maximum number of commits to inspect"
-    ),
-    verbose: bool = typer.Option(
-        False, "--verbose", "-v", help="Show old/new values in output"
-    ),
-    json_output: bool = typer.Option(
-        False, "--json", help="Output result as JSON for programmatic use"
-    ),
+    file: str | None = typer.Option(None, "--file", "-f", help="Direct .env file path (overrides env name)"),
+    key: str | None = typer.Option(None, "--key", "-k", help="Filter changes to a specific key"),
+    max_commits: int = typer.Option(50, "--max-commits", "-n", help="Maximum number of commits to inspect"),
+    verbose: bool = typer.Option(False, "--verbose", "-v", help="Show old/new values in output"),
+    json_output: bool = typer.Option(False, "--json", help="Output result as JSON for programmatic use"),
     config_path: str = typer.Option("", "--config", "-c", help="Config file path"),
 ):
     """Show git change history for an .env file.
@@ -710,18 +628,10 @@ app.add_typer(backup_app)
 @backup_app.command("create")
 def backup_create(
     env: str | None = typer.Argument(None, help="Environment name from config"),
-    file: str | None = typer.Option(
-        None, "--file", "-f", help="Direct .env file path (overrides env name)"
-    ),
-    all_envs: bool = typer.Option(
-        False, "--all", "-a", help="Backup all configured environments"
-    ),
-    encrypt: bool = typer.Option(
-        False, "--encrypt", "-e", help="Encrypt backup with Fernet"
-    ),
-    password: str | None = typer.Option(
-        None, "--password", "-p", help="Encryption password (prompted if omitted)"
-    ),
+    file: str | None = typer.Option(None, "--file", "-f", help="Direct .env file path (overrides env name)"),
+    all_envs: bool = typer.Option(False, "--all", "-a", help="Backup all configured environments"),
+    encrypt: bool = typer.Option(False, "--encrypt", "-e", help="Encrypt backup with Fernet"),
+    password: str | None = typer.Option(None, "--password", "-p", help="Encryption password (prompted if omitted)"),
     json_output: bool = typer.Option(False, "--json", help="Output result as JSON"),
     config_path: str = typer.Option("", "--config", "-c", help="Config file path"),
 ):
@@ -736,9 +646,7 @@ def backup_create(
             if p.exists():
                 files_to_backup.append(p)
             else:
-                err_console.print(
-                    f"[yellow]⚠[/yellow] Skipping {env_cfg.name}: file '{p}' not found"
-                )
+                err_console.print(f"[yellow]⚠[/yellow] Skipping {env_cfg.name}: file '{p}' not found")
     elif file:
         files_to_backup.append(Path(file))
     elif env:
@@ -765,9 +673,7 @@ def backup_create(
     else:
         for entry in result.backups:
             enc_tag = " (encrypted)" if entry.encrypted else ""
-            console.print(
-                f"[green]✓[/green] Backed up {entry.source_file}{enc_tag} → {entry.backup_path}"
-            )
+            console.print(f"[green]✓[/green] Backed up {entry.source_file}{enc_tag} → {entry.backup_path}")
         for err in result.errors:
             err_console.print(f"[red]Error:[/red] {err}")
 
@@ -799,12 +705,8 @@ def backup_list(
 @backup_app.command("restore")
 def backup_restore(
     name: str = typer.Argument(..., help="Backup name to restore"),
-    target: str | None = typer.Option(
-        None, "--target", "-t", help="Target file path (defaults to original)"
-    ),
-    password: str | None = typer.Option(
-        None, "--password", "-p", help="Decryption password (prompted if omitted)"
-    ),
+    target: str | None = typer.Option(None, "--target", "-t", help="Target file path (defaults to original)"),
+    password: str | None = typer.Option(None, "--password", "-p", help="Decryption password (prompted if omitted)"),
     json_output: bool = typer.Option(False, "--json", help="Output result as JSON"),
     config_path: str = typer.Option("", "--config", "-c", help="Config file path"),
 ):
@@ -831,21 +733,15 @@ def backup_restore(
 @app.command()
 def serve(
     port: int = typer.Option(8080, "--port", "-p", help="Port to listen on"),
-    host: str = typer.Option(
-        "127.0.0.1", "--host", "-H", help="Bind address (default: localhost only)"
-    ),
+    host: str = typer.Option("127.0.0.1", "--host", "-H", help="Bind address (default: localhost only)"),
     password: str | None = typer.Option(
         None,
         "--password",
         "-k",
         help="Encryption password (prompted if omitted, or use ENVAULT_ENCRYPT_KEY)",
     ),
-    api_key: str | None = typer.Option(
-        None, "--api-key", help="Bearer token for API auth (or set ENVAULT_API_KEY)"
-    ),
-    store: str | None = typer.Option(
-        None, "--store", "-s", help="Named store from config to use"
-    ),
+    api_key: str | None = typer.Option(None, "--api-key", help="Bearer token for API auth (or set ENVAULT_API_KEY)"),
+    store: str | None = typer.Option(None, "--store", "-s", help="Named store from config to use"),
     config_path: str = typer.Option("", "--config", "-c", help="Config file path"),
     api_token: str | None = typer.Option(
         None,

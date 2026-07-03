@@ -49,9 +49,7 @@ def test_tests_dir_has_zero_f841_violations() -> None:
         text=True,
         check=False,
     )
-    assert result.returncode == 0, (
-        f"tests/ has F841 violation(s):\n{result.stdout}\n{result.stderr}"
-    )
+    assert result.returncode == 0, f"tests/ has F841 violation(s):\n{result.stdout}\n{result.stderr}"
 
 
 def test_tests_dir_has_zero_f811_violations() -> None:
@@ -71,6 +69,4 @@ def test_tests_dir_has_zero_f811_violations() -> None:
         text=True,
         check=False,
     )
-    assert result.returncode == 0, (
-        f"tests/ has F811 violation(s):\n{result.stdout}\n{result.stderr}"
-    )
+    assert result.returncode == 0, f"tests/ has F811 violation(s):\n{result.stdout}\n{result.stderr}"

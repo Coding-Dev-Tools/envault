@@ -12,13 +12,9 @@ class SecretStoreConfig(BaseModel):
     """Configuration for a secret store integration."""
 
     type: str = Field(description="Store type: aws-ssm, vault, doppler, onepassword")
-    path_prefix: str = Field(
-        default="", description="Path/prefix for secrets in the store"
-    )
+    path_prefix: str = Field(default="", description="Path/prefix for secrets in the store")
     auth_method: str = Field(default="env", description="Auth method: env, token, file")
-    token_env_var: str = Field(
-        default="", description="Env var name containing auth token"
-    )
+    token_env_var: str = Field(default="", description="Env var name containing auth token")
     url: str = Field(default="", description="Store URL (for vault)")
 
 
@@ -47,9 +43,7 @@ class EnvaultConfig(BaseModel):
 
     stores: dict[str, SecretStoreConfig] = Field(default_factory=dict)
     audit_log_path: str = Field(default=".envault-audit.log")
-    gitignore_patterns: list[str] = Field(
-        default_factory=lambda: [".envault-audit.log"]
-    )
+    gitignore_patterns: list[str] = Field(default_factory=lambda: [".envault-audit.log"])
 
     @classmethod
     def load(cls, path: str | Path = ".envault.yml") -> EnvaultConfig:

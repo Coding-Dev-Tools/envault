@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-import pytest
-from envault.history import *
 from pathlib import Path
+
+import pytest
 
 # ── Fixtures ────────────────────────────────────────────────────────────────
 

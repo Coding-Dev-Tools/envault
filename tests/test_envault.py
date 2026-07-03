@@ -78,9 +78,7 @@ def test_init_config_no_example(tmp_path):
     """init_config with generate_example=False should skip .env.example."""
     path = tmp_path / ".envault.yml"
     example_path = tmp_path / ".env.example"
-    config = init_config(
-        "my-project", str(path), generate_example=False, example_path=str(example_path)
-    )
+    config = init_config("my-project", str(path), generate_example=False, example_path=str(example_path))
     assert config.project == "my-project"
     assert path.exists()
     assert not example_path.exists()
@@ -209,10 +207,7 @@ def test_diff_result_to_dict_no_mask():
         {},
     )
     d = result.to_dict(mask_values=False)
-    assert (
-        d["only_in_source"]["SECRET"]
-        == "a_very_long_secret_value_that_exceeds_16_chars"
-    )
+    assert d["only_in_source"]["SECRET"] == "a_very_long_secret_value_that_exceeds_16_chars"
 
 
 def test_diff_result_to_json_valid():
@@ -264,11 +259,7 @@ def test_format_diff_identical():
 def test_format_diff_different():
     result = diff_envs({"A": "1", "B": "2"}, {"A": "x", "C": "3"})
     output = format_diff(result)
-    assert (
-        "Only in source" in output
-        or "Differing" in output
-        or "Only in target" in output
-    )
+    assert "Only in source" in output or "Differing" in output or "Only in target" in output
 
 
 # ── Sync ────────────────────────────────────────────────────────────────────
@@ -357,18 +348,13 @@ def test_generate_secret_length():
 
 
 def test_generate_secret_chars():
-    secret = generate_secret(
-        100, use_upper=True, use_lower=True, use_digits=True, use_symbols=False
-    )
+    secret = generate_secret(100, use_upper=True, use_lower=True, use_digits=True, use_symbols=False)
     assert all(c.isalnum() for c in secret)
 
 
 def test_generate_secret_no_symbols():
     secret = generate_secret(100, use_symbols=False)
-    assert all(
-        c in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-        for c in secret
-    )
+    assert all(c in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789" for c in secret)
 
 
 def test_generate_secret_exclude():
@@ -749,9 +735,7 @@ def test_encrypt_roundtrip(tmp_path):
     assert env_file.exists()  # original not deleted
 
     # Decrypt
-    decrypted = decrypt_env(
-        encrypted, output_path=tmp_path / ".env.restored", password=password
-    )
+    decrypted = decrypt_env(encrypted, output_path=tmp_path / ".env.restored", password=password)
     assert decrypted.exists()
     assert decrypted.read_text() == "SECRET=my_value\nAPI_KEY=abc123\n"
 
@@ -847,9 +831,7 @@ def test_cli_diff_identical(tmp_path):
     env_b.write_text("KEY=value\n")
 
     runner = CliRunner()
-    result = runner.invoke(
-        app, ["diff", "--source", str(env_a), "--target", str(env_b)]
-    )
+    result = runner.invoke(app, ["diff", "--source", str(env_a), "--target", str(env_b)])
     assert result.exit_code == 0
     assert "identical" in result.stdout.lower()
 
@@ -866,9 +848,7 @@ def test_cli_diff_different(tmp_path):
     env_b.write_text("KEY=new\n")
 
     runner = CliRunner()
-    result = runner.invoke(
-        app, ["diff", "--source", str(env_a), "--target", str(env_b)]
-    )
+    result = runner.invoke(app, ["diff", "--source", str(env_a), "--target", str(env_b)])
     assert result.exit_code == 0
 
 
