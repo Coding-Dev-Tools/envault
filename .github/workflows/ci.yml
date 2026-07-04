@@ -33,7 +33,7 @@ jobs:
           pip install -e ".[dev]" --no-build-isolation
 
       - name: Lint with ruff
-        run: pip install ruff && ruff check src/ --target-version py310
+        run: ruff check src/ --target-version py310
 
       - name: Run tests
         env:

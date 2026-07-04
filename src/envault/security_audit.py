@@ -22,9 +22,7 @@ class SecurityIssue:
 
     @property
     def sort_rank(self) -> int:
-        return {"critical": 0, "high": 1, "medium": 2, "low": 3, "info": 4}.get(
-            self.severity, 5
-        )
+        return {"critical": 0, "high": 1, "medium": 2, "low": 3, "info": 4}.get(self.severity, 5)
 
 
 @dataclass
@@ -284,11 +282,7 @@ def _check_gitignore(file_path: Path) -> list[SecurityIssue]:
                     # *.ext glob pattern (e.g. *.env matches .env, .env.dev, .env.prod)
                     if line.startswith("*."):
                         ext = line[2:]  # e.g. "env"
-                        if (
-                            filename == f".{ext}"
-                            or filename.startswith(f".{ext}.")
-                            or filename.startswith(f".{ext}-")
-                        ):
+                        if filename == f".{ext}" or filename.startswith(f".{ext}.") or filename.startswith(f".{ext}-"):
                             is_ignored = True
                             break
                         # Also handle non-dot files: *.key matches server.key
@@ -425,8 +419,7 @@ def audit_env_file(
         # Unquote value
         value = raw_value.strip()
         if len(value) >= 2 and (
-            (value.startswith('"') and value.endswith('"'))
-            or (value.startswith("'") and value.endswith("'"))
+            (value.startswith('"') and value.endswith('"')) or (value.startswith("'") and value.endswith("'"))
         ):
             value = value[1:-1]
 
@@ -457,16 +450,9 @@ def audit_env_file(
             )
 
         # 3. Never-commit keys found in plain .env
-        if (
-            NEVER_COMMIT_KEYS.search(key)
-            and value
-            and not _is_weak_value(key, value)[0]
-        ):
+        if NEVER_COMMIT_KEYS.search(key) and value and not _is_weak_value(key, value)[0]:
             # Only flag if not already flagged at higher severity
-            already_flagged = any(
-                i.key == key and i.category == "hardcoded_credential"
-                for i in result.issues
-            )
+            already_flagged = any(i.key == key and i.category == "hardcoded_credential" for i in result.issues)
             if not already_flagged:
                 result.issues.append(
                     SecurityIssue(
@@ -479,15 +465,10 @@ def audit_env_file(
                 )
 
         # 4. Encryption recommended
-        if (
-            ENCRYPTION_RECOMMENDED_KEYS.search(key)
-            and value
-            and not _is_weak_value(key, value)[0]
-        ):
+        if ENCRYPTION_RECOMMENDED_KEYS.search(key) and value and not _is_weak_value(key, value)[0]:
             # Only flag if not already flagged as hardcoded or sensitive
             already_flagged = any(
-                i.key == key
-                and i.category in ("hardcoded_credential", "sensitive_in_plain_file")
+                i.key == key and i.category in ("hardcoded_credential", "sensitive_in_plain_file")
                 for i in result.issues
             )
             if not already_flagged:
@@ -514,11 +495,7 @@ def audit_env_file(
             )
 
         # 6. Unquoted values with special characters (shell injection risk)
-        if (
-            raw_value.strip()
-            and not raw_value.strip().startswith(('"', "'"))
-            and any(c in value for c in " $`\\!#")
-        ):
+        if raw_value.strip() and not raw_value.strip().startswith(('"', "'")) and any(c in value for c in " $`\\!#"):
             result.issues.append(
                 SecurityIssue(
                     severity="low",
@@ -544,9 +521,7 @@ def audit_env_file(
     return result
 
 
-def format_audit_report(
-    results: list[SecurityAuditResult], *, verbose: bool = False
-) -> str:
+def format_audit_report(results: list[SecurityAuditResult], *, verbose: bool = False) -> str:
     """Format security audit results into a human-readable report.
 
     Args:
@@ -584,9 +559,7 @@ def format_audit_report(
             }.get(issue.severity, "  ")
 
             key_part = f"[{issue.key}] " if issue.key else ""
-            lines.append(
-                f"  {severity_icon} {issue.severity.upper():8} {issue.category:24} {key_part}{issue.message}"
-            )
+            lines.append(f"  {severity_icon} {issue.severity.upper():8} {issue.category:24} {key_part}{issue.message}")
             if issue.suggestion and verbose:
                 lines.append(f"           → {issue.suggestion}")
 

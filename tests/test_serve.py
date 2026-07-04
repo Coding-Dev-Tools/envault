@@ -120,9 +120,7 @@ def test_create_handler_config_edge_cases(
     pass
 
 
-def _make_handler(
-    store, config: EnvaultConfig | None = None, api_key: str | None = None
-):
+def _make_handler(store, config: EnvaultConfig | None = None, api_key: str | None = None):
     """Create a handler class bound to the given store and return a mock instance.
 
     We create a mock request handler that has the routing logic from
@@ -211,9 +209,7 @@ def _build_handler_instance(handler_class):
         self_inner.end_headers()
         self_inner.wfile.write(body)
 
-    instance._send_json = lambda data, status=200: _capturing_send_json(
-        instance, data, status
-    )
+    instance._send_json = lambda data, status=200: _capturing_send_json(instance, data, status)
 
     return instance
 
@@ -372,9 +368,7 @@ class TestSecretsList:
     """Tests for GET /secrets endpoint — list all keys."""
 
     def test_list_keys(self):
-        store = _FakeStore(
-            {"DB_HOST": "localhost", "DB_PORT": "5432", "API_KEY": "abc"}
-        )
+        store = _FakeStore({"DB_HOST": "localhost", "DB_PORT": "5432", "API_KEY": "abc"})
         handler = _make_handler(store)
         handler.path = "/secrets"
         handler.do_GET()
@@ -385,9 +379,7 @@ class TestSecretsList:
         assert data["count"] == 3
 
     def test_list_keys_with_prefix(self):
-        store = _FakeStore(
-            {"DB_HOST": "localhost", "DB_PORT": "5432", "API_KEY": "abc"}
-        )
+        store = _FakeStore({"DB_HOST": "localhost", "DB_PORT": "5432", "API_KEY": "abc"})
         handler = _make_handler(store)
         handler.path = "/secrets?prefix=DB_"
         handler.do_GET()
@@ -826,9 +818,7 @@ class TestCreateHandler:
     def test_handler_class_with_api_key(self):
         """create_handler should bind api_key to the handler class."""
         store = _FakeStore({"X": "y"})
-        handler_class = create_handler(
-            store, EnvaultConfig(), encrypt_key="enc", api_key="api-token"
-        )
+        handler_class = create_handler(store, EnvaultConfig(), encrypt_key="enc", api_key="api-token")
 
         assert handler_class.api_key == "api-token"
 

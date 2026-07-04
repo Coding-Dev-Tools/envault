@@ -251,9 +251,5 @@ def format_backup_list(entries: list[BackupEntry]) -> str:
     lines = []
     for entry in entries:
         enc_tag = " [encrypted]" if entry.encrypted else ""
-        lines.append(
-            f"  {entry.name}{enc_tag}\n"
-            f"    Source: {entry.source_file}\n"
-            f"    Created: {entry.timestamp}"
-        )
+        lines.append(f"  {entry.name}{enc_tag}\n    Source: {entry.source_file}\n    Created: {entry.timestamp}")
     return "\n".join(lines)

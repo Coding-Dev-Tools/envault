@@ -10,6 +10,7 @@ from typing import Any
 
 class SecretStoreError(Exception):
     """Base exception for secret store operations."""
+
     pass
 
 
@@ -65,6 +66,7 @@ class LocalEnvStore(SecretStore):
         if self._cache is not None:
             return self._cache
         from envault.diff import load_env_file
+
         self._cache = load_env_file(self.env_file)
         return self._cache
 
@@ -162,7 +164,7 @@ class AwsSsmStore(SecretStore):
                 name = param["Name"]
                 # Strip the path prefix
                 if name.startswith(self.path_prefix + "/"):
-                    name = name[len(self.path_prefix) + 1:]
+                    name = name[len(self.path_prefix) + 1 :]
                 keys.append(name)
         return keys
 
@@ -173,8 +175,13 @@ class VaultStore(SecretStore):
     Requires: pip install hvac
     """
 
-    def __init__(self, url: str = "http://127.0.0.1:8200", token: str | None = None,
-                 mount_point: str = "secret", path_prefix: str = ""):
+    def __init__(
+        self,
+        url: str = "http://127.0.0.1:8200",
+        token: str | None = None,
+        mount_point: str = "secret",
+        path_prefix: str = "",
+    ):
         self.url = url
         self.token = token or os.environ.get("VAULT_TOKEN", "")
         self.mount_point = mount_point
@@ -260,6 +267,7 @@ class DopplerStore(SecretStore):
 
     def get(self, key: str) -> str | None:
         import requests
+
         url = f"{self._base_url}/configs/config/secrets"
         params = {"project": self.project, "config": self.config}
         resp = requests.get(url, headers=self._headers(), params=params, timeout=10)
@@ -273,22 +281,23 @@ class DopplerStore(SecretStore):
 
     def set(self, key: str, value: str) -> bool:
         import requests
+
         url = f"{self._base_url}/configs/config/secrets"
-        payload = {"project": self.project, "config": self.config,
-                    "secrets": {key: value}}
+        payload = {"project": self.project, "config": self.config, "secrets": {key: value}}
         resp = requests.put(url, headers=self._headers(), json=payload, timeout=10)
         return resp.status_code in (200, 201)
 
     def delete(self, key: str) -> bool:
         import requests
+
         url = f"{self._base_url}/configs/config/secrets"
-        payload = {"project": self.project, "config": self.config,
-                    "secrets": [key]}
+        payload = {"project": self.project, "config": self.config, "secrets": [key]}
         resp = requests.delete(url, headers=self._headers(), json=payload, timeout=10)
         return resp.status_code == 204
 
     def list_keys(self, prefix: str = "") -> list[str]:
         import requests
+
         url = f"{self._base_url}/configs/config/secrets"
         params = {"project": self.project, "config": self.config}
         resp = requests.get(url, headers=self._headers(), params=params, timeout=10)
@@ -308,8 +317,9 @@ class OnePasswordStore(SecretStore):
     Requires: pip install onepasswordconnectsdk
     """
 
-    def __init__(self, url: str = "http://localhost:8080", token: str | None = None,
-                 vault_id: str = "", path_prefix: str = ""):
+    def __init__(
+        self, url: str = "http://localhost:8080", token: str | None = None, vault_id: str = "", path_prefix: str = ""
+    ):
         self.url = url.rstrip("/")
         self.token = token or os.environ.get("OP_CONNECT_TOKEN", "")
         self.vault_id = vault_id or os.environ.get("OP_VAULT_ID", "")
@@ -323,6 +333,7 @@ class OnePasswordStore(SecretStore):
 
     def _api_get(self, path: str) -> dict | None:
         import requests
+
         resp = requests.get(f"{self.url}{path}", headers=self._headers(), timeout=10)
         if resp.status_code != 200:
             return None
@@ -330,6 +341,7 @@ class OnePasswordStore(SecretStore):
 
     def _api_post(self, path: str, data: dict) -> bool:
         import requests
+
         resp = requests.post(f"{self.url}{path}", headers=self._headers(), json=data, timeout=10)
         return resp.status_code in (200, 201)
 
@@ -342,7 +354,9 @@ class OnePasswordStore(SecretStore):
             fields = item.get("fields", [])
             for field in fields:
                 if field.get("purpose") == "PASSWORD" or field.get("label", "").lower() in (
-                    "password", "value", "credential"
+                    "password",
+                    "value",
+                    "credential",
                 ):
                     return field.get("value", "")
         return None
@@ -357,6 +371,7 @@ class OnePasswordStore(SecretStore):
 
     def delete(self, key: str) -> bool:
         import requests
+
         items = self._api_get(f"/v1/vaults/{self.vault_id}/items?filter=title%20eq%20%22{key}%22")
         if not items:
             return False
@@ -366,8 +381,9 @@ class OnePasswordStore(SecretStore):
         item_id = item_list[0].get("id")
         if not item_id:
             return False
-        resp = requests.delete(f"{self.url}/v1/vaults/{self.vault_id}/items/{item_id}",
-                                headers=self._headers(), timeout=10)
+        resp = requests.delete(
+            f"{self.url}/v1/vaults/{self.vault_id}/items/{item_id}", headers=self._headers(), timeout=10
+        )
         return resp.status_code == 204
 
     def list_keys(self, prefix: str = "") -> list[str]:

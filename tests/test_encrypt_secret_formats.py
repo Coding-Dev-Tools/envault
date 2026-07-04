@@ -5,9 +5,11 @@ Issue: COM-238
 """
 
 import base64
+
+from typer.testing import CliRunner
+
 from envault.cli import app
 from envault.encrypt import decrypt_env, encrypt_env, is_encrypted
-from typer.testing import CliRunner
 
 # ── Test Data ──────────────────────────────────────────────────────────────
 
@@ -42,13 +44,9 @@ SAMPLE_JSON_BLOB_NESTED = """{
   }
 }"""
 
-SAMPLE_BASE64_VALUE = base64.b64encode(
-    b"This is some binary data that was base64 encoded for a secret value!"
-).decode()
+SAMPLE_BASE64_VALUE = base64.b64encode(b"This is some binary data that was base64 encoded for a secret value!").decode()
 
-SAMPLE_BASE64URL_VALUE = base64.urlsafe_b64encode(
-    b"Binary data with special chars: \x00\x01\x02\xff"
-).decode()
+SAMPLE_BASE64URL_VALUE = base64.urlsafe_b64encode(b"Binary data with special chars: \x00\x01\x02\xff").decode()
 
 SAMPLE_UNICODE_CONTENT = """DATABASE_URL=postgresql://müller:p@sswörd@db.exämple.com:5432/pröd
 API_KEY=日本語テストキー123
@@ -120,9 +118,7 @@ class TestEncryptDecryptSSHKek:
         assert encrypted.exists()
         assert is_encrypted(encrypted)
 
-        decrypted = decrypt_env(
-            encrypted, output_path=tmp_path / ".env.restored", password=PASSWORD
-        )
+        decrypted = decrypt_env(encrypted, output_path=tmp_path / ".env.restored", password=PASSWORD)
         assert decrypted.read_text(encoding="utf-8") == content
 
     def test_rsa_public_key_roundtrip(self, tmp_path):
@@ -131,9 +127,7 @@ class TestEncryptDecryptSSHKek:
         env_file.write_text(content, encoding="utf-8")
 
         encrypted = encrypt_env(env_file, password=PASSWORD)
-        decrypted = decrypt_env(
-            encrypted, output_path=tmp_path / ".env.restored", password=PASSWORD
-        )
+        decrypted = decrypt_env(encrypted, output_path=tmp_path / ".env.restored", password=PASSWORD)
         assert decrypted.read_text(encoding="utf-8") == content
 
     def test_ec_private_key_roundtrip(self, tmp_path):
@@ -142,9 +136,7 @@ class TestEncryptDecryptSSHKek:
         env_file.write_text(content, encoding="utf-8")
 
         encrypted = encrypt_env(env_file, password=PASSWORD)
-        decrypted = decrypt_env(
-            encrypted, output_path=tmp_path / ".env.restored", password=PASSWORD
-        )
+        decrypted = decrypt_env(encrypted, output_path=tmp_path / ".env.restored", password=PASSWORD)
         assert decrypted.read_text(encoding="utf-8") == content
 
 
@@ -157,9 +149,7 @@ class TestEncryptDecryptBase64:
         env_file.write_text(content, encoding="utf-8")
 
         encrypted = encrypt_env(env_file, password=PASSWORD)
-        decrypted = decrypt_env(
-            encrypted, output_path=tmp_path / ".env.restored", password=PASSWORD
-        )
+        decrypted = decrypt_env(encrypted, output_path=tmp_path / ".env.restored", password=PASSWORD)
         assert decrypted.read_text(encoding="utf-8") == content
 
     def test_base64url_roundtrip(self, tmp_path):
@@ -168,9 +158,7 @@ class TestEncryptDecryptBase64:
         env_file.write_text(content, encoding="utf-8")
 
         encrypted = encrypt_env(env_file, password=PASSWORD)
-        decrypted = decrypt_env(
-            encrypted, output_path=tmp_path / ".env.restored", password=PASSWORD
-        )
+        decrypted = decrypt_env(encrypted, output_path=tmp_path / ".env.restored", password=PASSWORD)
         assert decrypted.read_text(encoding="utf-8") == content
 
     def test_base64_with_padding_roundtrip(self, tmp_path):
@@ -181,9 +169,7 @@ class TestEncryptDecryptBase64:
         env_file.write_text(content, encoding="utf-8")
 
         encrypted = encrypt_env(env_file, password=PASSWORD)
-        decrypted = decrypt_env(
-            encrypted, output_path=tmp_path / ".env.restored", password=PASSWORD
-        )
+        decrypted = decrypt_env(encrypted, output_path=tmp_path / ".env.restored", password=PASSWORD)
         assert decrypted.read_text(encoding="utf-8") == content
 
 
@@ -196,9 +182,7 @@ class TestEncryptDecryptJSON:
         env_file.write_text(content, encoding="utf-8")
 
         encrypted = encrypt_env(env_file, password=PASSWORD)
-        decrypted = decrypt_env(
-            encrypted, output_path=tmp_path / ".env.restored", password=PASSWORD
-        )
+        decrypted = decrypt_env(encrypted, output_path=tmp_path / ".env.restored", password=PASSWORD)
         assert decrypted.read_text(encoding="utf-8") == content
 
     def test_json_nested_roundtrip(self, tmp_path):
@@ -207,9 +191,7 @@ class TestEncryptDecryptJSON:
         env_file.write_text(content, encoding="utf-8")
 
         encrypted = encrypt_env(env_file, password=PASSWORD)
-        decrypted = decrypt_env(
-            encrypted, output_path=tmp_path / ".env.restored", password=PASSWORD
-        )
+        decrypted = decrypt_env(encrypted, output_path=tmp_path / ".env.restored", password=PASSWORD)
         assert decrypted.read_text(encoding="utf-8") == content
 
     def test_docker_config_json_roundtrip(self, tmp_path):
@@ -218,9 +200,7 @@ class TestEncryptDecryptJSON:
         env_file.write_text(content, encoding="utf-8")
 
         encrypted = encrypt_env(env_file, password=PASSWORD)
-        decrypted = decrypt_env(
-            encrypted, output_path=tmp_path / ".env.restored", password=PASSWORD
-        )
+        decrypted = decrypt_env(encrypted, output_path=tmp_path / ".env.restored", password=PASSWORD)
         assert decrypted.read_text(encoding="utf-8") == content
 
 
@@ -232,9 +212,7 @@ class TestEncryptDecryptUnicode:
         env_file.write_text(SAMPLE_UNICODE_CONTENT, encoding="utf-8")
 
         encrypted = encrypt_env(env_file, password=PASSWORD)
-        decrypted = decrypt_env(
-            encrypted, output_path=tmp_path / ".env.restored", password=PASSWORD
-        )
+        decrypted = decrypt_env(encrypted, output_path=tmp_path / ".env.restored", password=PASSWORD)
         assert decrypted.read_text(encoding="utf-8") == SAMPLE_UNICODE_CONTENT
 
     def test_cjk_characters_roundtrip(self, tmp_path):
@@ -243,9 +221,7 @@ class TestEncryptDecryptUnicode:
         env_file.write_text(content, encoding="utf-8")
 
         encrypted = encrypt_env(env_file, password=PASSWORD)
-        decrypted = decrypt_env(
-            encrypted, output_path=tmp_path / ".env.restored", password=PASSWORD
-        )
+        decrypted = decrypt_env(encrypted, output_path=tmp_path / ".env.restored", password=PASSWORD)
         assert decrypted.read_text(encoding="utf-8") == content
 
     def test_emoji_roundtrip(self, tmp_path):
@@ -254,9 +230,7 @@ class TestEncryptDecryptUnicode:
         env_file.write_text(content, encoding="utf-8")
 
         encrypted = encrypt_env(env_file, password=PASSWORD)
-        decrypted = decrypt_env(
-            encrypted, output_path=tmp_path / ".env.restored", password=PASSWORD
-        )
+        decrypted = decrypt_env(encrypted, output_path=tmp_path / ".env.restored", password=PASSWORD)
         assert decrypted.read_text(encoding="utf-8") == content
 
     def test_rtl_scripts_roundtrip(self, tmp_path):
@@ -265,9 +239,7 @@ class TestEncryptDecryptUnicode:
         env_file.write_text(content, encoding="utf-8")
 
         encrypted = encrypt_env(env_file, password=PASSWORD)
-        decrypted = decrypt_env(
-            encrypted, output_path=tmp_path / ".env.restored", password=PASSWORD
-        )
+        decrypted = decrypt_env(encrypted, output_path=tmp_path / ".env.restored", password=PASSWORD)
         assert decrypted.read_text(encoding="utf-8") == content
 
     def test_mixed_unicode_ascii_roundtrip(self, tmp_path):
@@ -276,9 +248,7 @@ class TestEncryptDecryptUnicode:
         env_file.write_text(content, encoding="utf-8")
 
         encrypted = encrypt_env(env_file, password=PASSWORD)
-        decrypted = decrypt_env(
-            encrypted, output_path=tmp_path / ".env.restored", password=PASSWORD
-        )
+        decrypted = decrypt_env(encrypted, output_path=tmp_path / ".env.restored", password=PASSWORD)
         assert decrypted.read_text(encoding="utf-8") == content
 
 
@@ -291,9 +261,7 @@ class TestEncryptDecryptJWT:
         env_file.write_text(content, encoding="utf-8")
 
         encrypted = encrypt_env(env_file, password=PASSWORD)
-        decrypted = decrypt_env(
-            encrypted, output_path=tmp_path / ".env.restored", password=PASSWORD
-        )
+        decrypted = decrypt_env(encrypted, output_path=tmp_path / ".env.restored", password=PASSWORD)
         assert decrypted.read_text(encoding="utf-8") == content
 
 
@@ -306,9 +274,7 @@ class TestEncryptDecryptPEM:
         env_file.write_text(content, encoding="utf-8")
 
         encrypted = encrypt_env(env_file, password=PASSWORD)
-        decrypted = decrypt_env(
-            encrypted, output_path=tmp_path / ".env.restored", password=PASSWORD
-        )
+        decrypted = decrypt_env(encrypted, output_path=tmp_path / ".env.restored", password=PASSWORD)
         assert decrypted.read_text(encoding="utf-8") == content
 
 
@@ -322,9 +288,7 @@ class TestEncryptDecryptComplexMixed:
         env_file.write_text(content, encoding="utf-8")
 
         encrypted = encrypt_env(env_file, password=PASSWORD)
-        decrypted = decrypt_env(
-            encrypted, output_path=tmp_path / ".env.restored", password=PASSWORD
-        )
+        decrypted = decrypt_env(encrypted, output_path=tmp_path / ".env.restored", password=PASSWORD)
         assert decrypted.read_text(encoding="utf-8") == content
 
     def test_binary_like_content_roundtrip(self, tmp_path):
@@ -335,9 +299,7 @@ class TestEncryptDecryptComplexMixed:
         env_file.write_text(content, encoding="utf-8")
 
         encrypted = encrypt_env(env_file, password=PASSWORD)
-        decrypted = decrypt_env(
-            encrypted, output_path=tmp_path / ".env.restored", password=PASSWORD
-        )
+        decrypted = decrypt_env(encrypted, output_path=tmp_path / ".env.restored", password=PASSWORD)
         assert decrypted.read_text(encoding="utf-8") == content
 
 
