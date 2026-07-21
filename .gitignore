@@ -53,3 +53,4 @@ local.db
 
 # Added by release-prep
 node_modules
+*.bak
