@@ -19,7 +19,6 @@ from __future__ import annotations
 import base64
 import json
 import os
-import secrets as _secrets
 import time
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
@@ -68,36 +67,6 @@ class SecretHandler(BaseHTTPRequestHandler):
     def _send_error(self, status: int, message: str) -> None:
         """Send a JSON error payload."""
         self._send_json({"error": message}, status=status)
-
-    def _check_auth(self) -> bool:
-        """Validate the Bearer token if API auth is enabled.
-
-        Returns True if the request is authorized (or auth is disabled).
-        Returns False if auth is required but missing/invalid (and sends 401).
-        """
-        if not self.api_key:
-            # Auth not configured — allow all requests
-            return True
-
-        auth_header = self.headers.get("Authorization", "")
-        if not auth_header:
-            self._send_error(401, "Unauthorized: valid Bearer token required")
-            return False
-
-        token = auth_header[len("Bearer ") :] if auth_header.startswith("Bearer ") else auth_header
-        if not token or not token.strip():
-            self._send_error(401, "Unauthorized: valid Bearer token required")
-            return False
-
-        if (
-            _secrets.compare_digest(token.strip(), self.api_key)
-            if self.api_key
-            else _secrets.compare_digest(token.strip(), "")
-        ):
-            return True
-
-        self._send_error(401, "Unauthorized: valid Bearer token required")
-        return False
 
     # ── Routing ──────────────────────────────────────────────────────────────
 
@@ -330,6 +299,9 @@ class SecretHandler(BaseHTTPRequestHandler):
         if path == "/health":
             # /health is always accessible (useful for load balancers)
             self._handle_health()
+        elif path == "/auth/info":
+            # /auth/info is always accessible so clients can discover auth methods
+            self._handle_auth_info()
         elif path == "/secrets":
             if not self._check_auth():
                 return

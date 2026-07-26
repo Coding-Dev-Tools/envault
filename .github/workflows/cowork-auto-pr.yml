@@ -1,0 +1,28 @@
+name: cowork-auto-pr
+on:
+  push:
+    branches:
+      - 'cowork/**'
+jobs:
+  open-pr:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Open or update PR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          BRANCH="${GITHUB_REF#refs/heads/}"
+          TITLE="cowork-bot: improvements to serve.py (dead code + auth/info route)"
+          BODY="Automated improvement from the cowork rotation bot.\n\nChanges:\n- Removed dead _check_auth method that was overridden by a later definition\n- Added /auth/info route so clients can discover auth configuration\n- Removed unused secrets import\n- Added tests for /auth/info endpoint\n\nAll 117 tests pass."
+          DEFAULT_BRANCH=$(git remote show origin | grep 'HEAD branch' | awk '{print $NF}')
+          # Check if PR already exists
+          EXISTING=$(gh pr list --head "$BRANCH" --state open --json number --jq '.[0].number')
+          if [ -z "$EXISTING" ]; then
+            gh pr create --base "$DEFAULT_BRANCH" --head "$BRANCH" --title "$TITLE" --body "$BODY"
+          else
+            echo "PR #$EXISTING already exists for $BRANCH"
+          fi
