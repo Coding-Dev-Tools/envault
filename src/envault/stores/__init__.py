@@ -346,7 +346,10 @@ class OnePasswordStore(SecretStore):
         return resp.status_code in (200, 201)
 
     def get(self, key: str) -> str | None:
-        items = self._api_get(f"/v1/vaults/{self.vault_id}/items?filter=title%20eq%20%22{key}%22")
+        from urllib.parse import quote
+
+        encoded_key = quote(key, safe="")
+        items = self._api_get(f"/v1/vaults/{self.vault_id}/items?filter=title%20eq%20%22{encoded_key}%22")
         if not items:
             return None
         item_list = items if isinstance(items, list) else items.get("items", [])
@@ -370,9 +373,12 @@ class OnePasswordStore(SecretStore):
         return self._api_post(f"/v1/vaults/{self.vault_id}/items", payload)
 
     def delete(self, key: str) -> bool:
+        from urllib.parse import quote
+
         import requests
 
-        items = self._api_get(f"/v1/vaults/{self.vault_id}/items?filter=title%20eq%20%22{key}%22")
+        encoded_key = quote(key, safe="")
+        items = self._api_get(f"/v1/vaults/{self.vault_id}/items?filter=title%20eq%20%22{encoded_key}%22")
         if not items:
             return False
         item_list = items if isinstance(items, list) else items.get("items", [])

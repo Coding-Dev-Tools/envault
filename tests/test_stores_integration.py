@@ -465,6 +465,58 @@ class TestOnePasswordStoreDeep:
             keys = store.list_keys(prefix="DB_")
             assert keys == ["DB_HOST", "DB_PORT"]
 
+    def test_get_url_encodes_special_characters_in_key(self):
+        """Keys with special chars (&, =, #, spaces, quotes) must be URL-encoded in the filter."""
+        from urllib.parse import quote
+
+        import responses
+
+        from envault.stores import OnePasswordStore
+
+        store = OnePasswordStore(token="fake", vault_id="v1")
+        base_url = "http://localhost:8080/v1/vaults/v1/items"
+        # Key with characters that break unencoded URLs
+        key = 'MY&KEY=WITH#SPECIAL "CHARS"'
+        encoded_key = quote(key, safe="")
+        filter_url = f'{base_url}?filter=title%20eq%20%22{encoded_key}%22'
+
+        with responses.RequestsMock() as rsps:
+            items = [
+                {
+                    "title": key,
+                    "fields": [{"purpose": "PASSWORD", "value": "secret_val"}],
+                }
+            ]
+            rsps.get(filter_url, json=items)
+            result = store.get(key)
+            assert result == "secret_val"
+            # Verify the request was made with the properly encoded URL
+            assert len(rsps.calls) == 1
+            assert encoded_key in rsps.calls[0].request.url
+
+    def test_delete_url_encodes_special_characters_in_key(self):
+        """delete() must also URL-encode keys with special characters."""
+        from urllib.parse import quote
+
+        import responses
+
+        from envault.stores import OnePasswordStore
+
+        store = OnePasswordStore(token="fake", vault_id="v1")
+        base_url = "http://localhost:8080/v1/vaults/v1/items"
+        key = "KEY/WITH/SLASHES&AMP"
+        encoded_key = quote(key, safe="")
+        filter_url = f'{base_url}?filter=title%20eq%20%22{encoded_key}%22'
+        item_id = "item-del-special"
+
+        with responses.RequestsMock() as rsps:
+            rsps.get(filter_url, json=[{"id": item_id, "title": key}])
+            rsps.delete(f"{base_url}/{item_id}", status=204)
+            result = store.delete(key)
+            assert result is True
+            assert len(rsps.calls) == 2
+            assert encoded_key in rsps.calls[0].request.url
+
 
 # ── Store factory deeper tests ──────────────────────────────────────────────
 
