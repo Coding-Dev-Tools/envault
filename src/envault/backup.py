@@ -92,15 +92,31 @@ def _get_backup_dir(project_dir: Path | str = ".") -> Path:
 
 
 def _load_manifest(backup_dir: Path) -> list[BackupEntry]:
-    """Load the backup manifest from disk."""
+    """Load the backup manifest from disk.
+
+    Skips individual corrupt entries rather than discarding the entire
+    manifest, preserving valid backups when one entry is malformed.
+    """
     manifest_path = backup_dir / BACKUP_MANIFEST
     if not manifest_path.exists():
         return []
     try:
         data = json.loads(manifest_path.read_text(encoding="utf-8"))
-        return [BackupEntry.from_dict(entry) for entry in data]
-    except (json.JSONDecodeError, KeyError):
+    except json.JSONDecodeError:
         return []
+
+    if not isinstance(data, list):
+        return []
+
+    entries: list[BackupEntry] = []
+    for entry in data:
+        if not isinstance(entry, dict):
+            continue
+        try:
+            entries.append(BackupEntry.from_dict(entry))
+        except (KeyError, TypeError):
+            continue
+    return entries
 
 
 def _save_manifest(backup_dir: Path, entries: list[BackupEntry]) -> None:
