@@ -478,7 +478,7 @@ class TestOnePasswordStoreDeep:
         # Key with characters that break unencoded URLs
         key = 'MY&KEY=WITH#SPECIAL "CHARS"'
         encoded_key = quote(key, safe="")
-        filter_url = f'{base_url}?filter=title%20eq%20%22{encoded_key}%22'
+        filter_url = f"{base_url}?filter=title%20eq%20%22{encoded_key}%22"
 
         with responses.RequestsMock() as rsps:
             items = [
@@ -506,7 +506,7 @@ class TestOnePasswordStoreDeep:
         base_url = "http://localhost:8080/v1/vaults/v1/items"
         key = "KEY/WITH/SLASHES&AMP"
         encoded_key = quote(key, safe="")
-        filter_url = f'{base_url}?filter=title%20eq%20%22{encoded_key}%22'
+        filter_url = f"{base_url}?filter=title%20eq%20%22{encoded_key}%22"
         item_id = "item-del-special"
 
         with responses.RequestsMock() as rsps:
