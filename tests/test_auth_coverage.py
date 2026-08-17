@@ -18,7 +18,6 @@ from envault.auth import (
     build_auth_from_env,
 )
 
-
 # ── AuthResult ───────────────────────────────────────────────────────────
 
 
