@@ -241,11 +241,60 @@ class TestVaultStore:
 
         store = VaultStore(token="s.test")
         mock_client = MagicMock()
-        mock_client.secrets.kv.v2.list_secrets.side_effect = Exception("no keys")
+        mock_client.secrets.kv.v2.list_secrets.side_effect = Exception("404 path not found")
 
         with patch.object(store, "_get_client", return_value=mock_client):
             keys = store.list_keys()
             assert keys == []
+
+    def test_get_raises_on_real_error(self):
+        """Auth/connection/server errors must NOT be reported as 'missing key'."""
+        from envault.stores import SecretStoreError, VaultStore
+
+        store = VaultStore(token="s.test")
+        mock_client = MagicMock()
+        mock_client.secrets.kv.v2.read_secret.side_effect = Exception("permission denied")
+
+        with patch.object(store, "_get_client", return_value=mock_client), pytest.raises(
+            SecretStoreError, match="Vault read failed"
+        ):
+            store.get("MY_KEY")
+
+    def test_delete_raises_on_real_error(self):
+        from envault.stores import SecretStoreError, VaultStore
+
+        store = VaultStore(token="s.test")
+        mock_client = MagicMock()
+        mock_client.secrets.kv.v2.delete_metadata_and_all_versions.side_effect = Exception(
+            "connection refused"
+        )
+
+        with patch.object(store, "_get_client", return_value=mock_client), pytest.raises(
+            SecretStoreError, match="Vault delete failed"
+        ):
+            store.delete("OLD_KEY")
+
+    def test_list_raises_on_real_error(self):
+        from envault.stores import SecretStoreError, VaultStore
+
+        store = VaultStore(token="s.test")
+        mock_client = MagicMock()
+        mock_client.secrets.kv.v2.list_secrets.side_effect = Exception("500 internal server error")
+
+        with patch.object(store, "_get_client", return_value=mock_client), pytest.raises(
+            SecretStoreError, match="Vault list failed"
+        ):
+            store.list_keys()
+
+    def test_hvac_invalid_path_class_is_missing(self):
+        """hvac.exceptions.InvalidPath (matched by class name) means 'not found'."""
+        from envault.stores import _is_missing_path_error
+
+        class InvalidPath(Exception):
+            pass
+
+        assert _is_missing_path_error(InvalidPath("missing")) is True
+        assert _is_missing_path_error(Exception("connection refused")) is False
 
     def test_vault_auth_fails(self):
         from envault.stores import SecretStoreError, VaultStore
@@ -309,6 +358,32 @@ class TestDopplerStoreDeep:
             )
             result = store.get("MY_KEY")
             assert result == "computed_val"
+
+    def test_get_many_single_request(self):
+        import responses
+
+        from envault.stores import DopplerStore
+
+        store = DopplerStore(project="myapp", config="prd", token="dp-test")
+        url = "https://api.doppler.com/v3/configs/config/secrets"
+
+        with responses.RequestsMock() as rsps:
+            rsps.get(
+                url,
+                json={
+                    "secrets": {
+                        "A": {"raw": "va", "computed": ""},
+                        "B": {"raw": "", "computed": "vb"},
+                        "EMPTY": {"raw": "  ", "computed": "  "},
+                    }
+                },
+            )
+            result = store.get_many(["A", "B", "EMPTY", "MISSING"])
+            assert result == {"A": "va", "B": "vb"}
+
+            # A second batch must reuse the same single mocked response (one request total).
+            assert store.get_many(["A"]) == {"A": "va"}
+            assert len(rsps.calls) == 2  # one per get_many call, not per key
 
     def test_list_keys_with_prefix(self):
         import responses

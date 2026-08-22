@@ -14,6 +14,20 @@ class SecretStoreError(Exception):
     pass
 
 
+def _is_missing_path_error(exc: BaseException) -> bool:
+    """Heuristically decide whether an exception means 'key does not exist'.
+
+    Matches hvac's InvalidPath (checked by class name so hvac stays an optional
+    dependency) plus common HTTP-404 style messages. Anything else — auth
+    failures, connection errors, server errors — is NOT a missing key and must
+    surface to the caller instead of being silently swallowed.
+    """
+    if type(exc).__name__ == "InvalidPath":
+        return True
+    message = str(exc).lower()
+    return "404" in message or "not found" in message or "path" in message and "missing" in message
+
+
 class SecretStore(ABC):
     """Abstract base class for secret store integrations."""
 
@@ -210,8 +224,10 @@ class VaultStore(SecretStore):
             )
             data = response.get("data", {}).get("data", {})
             return data.get("value")
-        except Exception:
-            return None
+        except Exception as exc:
+            if _is_missing_path_error(exc):
+                return None
+            raise SecretStoreError(f"Vault read failed for {key!r}: {exc}") from exc
 
     def set(self, key: str, value: str) -> bool:
         client = self._get_client()
@@ -230,8 +246,10 @@ class VaultStore(SecretStore):
                 mount_point=self.mount_point,
             )
             return True
-        except Exception:
-            return False
+        except Exception as exc:
+            if _is_missing_path_error(exc):
+                return False
+            raise SecretStoreError(f"Vault delete failed for {key!r}: {exc}") from exc
 
     def list_keys(self, prefix: str = "") -> list[str]:
         client = self._get_client()
@@ -242,8 +260,10 @@ class VaultStore(SecretStore):
                 mount_point=self.mount_point,
             )
             return response.get("data", {}).get("keys", [])
-        except Exception:
-            return []
+        except Exception as exc:
+            if _is_missing_path_error(exc):
+                return []
+            raise SecretStoreError(f"Vault list failed at {list_path!r}: {exc}") from exc
 
 
 class DopplerStore(SecretStore):
@@ -278,6 +298,26 @@ class DopplerStore(SecretStore):
         if key in secrets:
             return secrets[key].get("raw", "").strip() or secrets[key].get("computed", "").strip()
         return None
+
+    def get_many(self, keys: list[str]) -> dict[str, str]:
+        """Batch fetch: Doppler returns the whole config's secrets per request,
+        so one request serves all keys instead of one request per key."""
+        import requests
+
+        url = f"{self._base_url}/configs/config/secrets"
+        params = {"project": self.project, "config": self.config}
+        resp = requests.get(url, headers=self._headers(), params=params, timeout=10)
+        if resp.status_code != 200:
+            return {}
+        data = resp.json()
+        secrets = data.get("secrets", {})
+        result: dict[str, str] = {}
+        for key in keys:
+            if key in secrets:
+                value = secrets[key].get("raw", "").strip() or secrets[key].get("computed", "").strip()
+                if value:
+                    result[key] = value
+        return result
 
     def set(self, key: str, value: str) -> bool:
         import requests
