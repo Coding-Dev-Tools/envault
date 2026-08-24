@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import contextlib
 import os
+import re
 import secrets
 import string
 from pathlib import Path
@@ -176,3 +178,83 @@ def rotate_env_var(
         audit.log("rotate", key, env_file=str(env_file))
 
     return True, new_value
+
+
+def _atomic_write(path: Path, content: str) -> None:
+    """Write *content* to *path* atomically (temp file + os.replace).
+
+    A crash mid-write must never leave a truncated or half-rotated .env file.
+    """
+    tmp = path.with_name(f".{path.name}.rotate-tmp-{os.getpid()}")
+    try:
+        with open(tmp, "w") as f:
+            f.write(content)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp, path)
+    except BaseException:
+        with contextlib.suppress(OSError):
+            os.unlink(tmp)
+        raise
+
+
+def rotate_env_file(
+    env_file: str | Path,
+    *,
+    length: int = 32,
+    exclude: set[str] | None = None,
+    dry_run: bool = False,
+    audit: AuditLogger | None = None,
+) -> dict[str, str]:
+    """Rotate every variable in a .env file with ONE atomic rewrite.
+
+    Args:
+        env_file: Path to the .env file.
+        length: Length of generated secrets.
+        exclude: Keys to leave untouched.
+        dry_run: If True, don't modify the file.
+        audit: Optional audit logger (one entry per rotated key).
+
+    Returns:
+        Mapping of key -> new value for every rotated key.
+    """
+    from dotenv import dotenv_values
+
+    env_file = Path(env_file)
+    exclude = exclude or set()
+    env_vars = dotenv_values(env_file)
+
+    plan: dict[str, str] = {}
+    for key, value in env_vars.items():
+        if key in exclude or value is None:
+            continue
+        plan[key] = rotate_value(key, value, length=length)
+
+    if dry_run or not plan:
+        return plan
+
+    lines = env_file.read_text().split("\n")
+    seen: set[str] = set()
+    out_lines: list[str] = []
+    key_line = re.compile(r"^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=")
+    for line in lines:
+        m = key_line.match(line)
+        if m and m.group(1) in plan and m.group(1) not in seen:
+            key = m.group(1)
+            seen.add(key)
+            new_value = plan[key]
+            if any(c in new_value for c in " #'\"\n\t"):
+                safe = new_value.replace("\\", "\\\\").replace('"', '\\"')
+                out_lines.append(f'{key}="{safe}"')
+            else:
+                out_lines.append(f"{key}={new_value}")
+        else:
+            out_lines.append(line)
+
+    _atomic_write(env_file, "\n".join(out_lines))
+
+    if audit:
+        for key in plan:
+            audit.log("rotate", key, env_file=str(env_file))
+
+    return plan
