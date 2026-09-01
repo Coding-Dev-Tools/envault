@@ -171,8 +171,7 @@ def rotate_env_var(
 
     new_content = pattern.sub(replacement, content)
 
-    with open(env_file, "w") as f:
-        f.write(new_content)
+    _atomic_write(env_file, new_content)
 
     if audit:
         audit.log("rotate", key, env_file=str(env_file))

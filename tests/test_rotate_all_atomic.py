@@ -65,3 +65,19 @@ def test_rotate_env_file_audit_entries(tmp_path):
     rotate_env_file(env, audit=AuditLogger(log))
     entries = [line for line in log.read_text().splitlines() if line]
     assert len(entries) == 2
+
+
+def test_rotate_env_var_atomic_write(tmp_path):
+    """rotate_env_var must use atomic write: no temp files left, file not corrupted."""
+    from envault.diff import load_env_file
+    from envault.rotate import rotate_env_var
+
+    env = _write(tmp_path, "DB_PASSWORD=old\nAPI_KEY=keep\n")
+    rotate_env_var("DB_PASSWORD", env, length=16)
+    # No temp files left behind
+    leftovers = list(tmp_path.glob(".*rotate-tmp-*"))
+    assert leftovers == []
+    # Content is correct and other keys preserved
+    new = load_env_file(env)
+    assert new["DB_PASSWORD"] != "old" and len(new["DB_PASSWORD"]) > 0
+    assert new["API_KEY"] == "keep"
