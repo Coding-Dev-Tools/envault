@@ -184,7 +184,9 @@ def _get_commits_for_file(file_path: Path, *, max_commits: int = 50) -> list[str
                 f"--max-count={max_commits}",
                 "--format=%H",
                 "--",
-                str(file_path),
+                # git pathspecs always use "/" — backslashes silently match
+                # nothing on Windows, which reads as "no history".
+                file_path.as_posix(),
             ],
             capture_output=True,
             text=True,
@@ -209,7 +211,7 @@ def _diff_at_commit(
     or changed.
     """
     # Get commit metadata
-    meta = _get_commit_meta(commit)
+    meta = _get_commit_meta(commit, cwd=file_path.parent)
     if meta is None:
         return []
 
@@ -274,18 +276,28 @@ def _diff_at_commit(
     return changes
 
 
-def _get_commit_meta(commit: str) -> dict | None:
-    """Get author, date, and message for a commit."""
+def _get_commit_meta(commit: str, cwd: Path | None = None) -> dict | None:
+    """Get author, date, and message for a commit.
+
+    Args:
+        commit: Commit hash (or ref) to describe.
+        cwd: Directory inside the repo that owns the commit. Without it the
+            lookup runs in the process CWD and silently returns None when the
+            caller's library code runs from a different repository.
+    """
     try:
+        # %x00 (NUL) separators: author names or subjects containing "|" would
+        # otherwise break the split and silently drop every change in the commit.
         result = subprocess.run(
-            ["git", "show", "-s", "--format=%an|%ai|%s", commit],
+            ["git", "show", "-s", "--format=%an%x00%ai%x00%s", commit],
             capture_output=True,
             text=True,
+            cwd=cwd if cwd is not None and Path(cwd).exists() else ".",
             timeout=10,
         )
         if result.returncode != 0:
             return None
-        parts = result.stdout.strip().split("|", 2)
+        parts = result.stdout.rstrip("\n").split("\x00", 2)
         if len(parts) != 3:
             return None
         return {"author": parts[0], "date": parts[1], "message": parts[2]}
@@ -344,7 +356,9 @@ def _get_relative_path(file_path: Path) -> str:
         if result.returncode == 0:
             repo_root = Path(result.stdout.strip())
             try:
-                return str(abs_path.relative_to(repo_root))
+                # POSIX separators: `git show <ref>:a\b.env` fails on Windows;
+                # git object paths always use "/".
+                return abs_path.relative_to(repo_root).as_posix()
             except ValueError:
                 pass
     except (subprocess.TimeoutExpired, FileNotFoundError):

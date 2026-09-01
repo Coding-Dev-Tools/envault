@@ -16,6 +16,7 @@ import os
 import time
 from typing import Any
 from urllib.error import URLError
+from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
 
@@ -164,7 +165,7 @@ class OAuth2Auth:
         import base64
 
         url = f"{self._provider_url}/introspect"
-        body = f"token={token}".encode()
+        body = urlencode({"token": token}).encode()
         headers: dict[str, str] = {
             "Content-Type": "application/x-www-form-urlencoded",
         }

@@ -241,11 +241,60 @@ class TestVaultStore:
 
         store = VaultStore(token="s.test")
         mock_client = MagicMock()
-        mock_client.secrets.kv.v2.list_secrets.side_effect = Exception("no keys")
+        mock_client.secrets.kv.v2.list_secrets.side_effect = Exception("404 path not found")
 
         with patch.object(store, "_get_client", return_value=mock_client):
             keys = store.list_keys()
             assert keys == []
+
+    def test_get_raises_on_real_error(self):
+        """Auth/connection/server errors must NOT be reported as 'missing key'."""
+        from envault.stores import SecretStoreError, VaultStore
+
+        store = VaultStore(token="s.test")
+        mock_client = MagicMock()
+        mock_client.secrets.kv.v2.read_secret.side_effect = Exception("permission denied")
+
+        with patch.object(store, "_get_client", return_value=mock_client), pytest.raises(
+            SecretStoreError, match="Vault read failed"
+        ):
+            store.get("MY_KEY")
+
+    def test_delete_raises_on_real_error(self):
+        from envault.stores import SecretStoreError, VaultStore
+
+        store = VaultStore(token="s.test")
+        mock_client = MagicMock()
+        mock_client.secrets.kv.v2.delete_metadata_and_all_versions.side_effect = Exception(
+            "connection refused"
+        )
+
+        with patch.object(store, "_get_client", return_value=mock_client), pytest.raises(
+            SecretStoreError, match="Vault delete failed"
+        ):
+            store.delete("OLD_KEY")
+
+    def test_list_raises_on_real_error(self):
+        from envault.stores import SecretStoreError, VaultStore
+
+        store = VaultStore(token="s.test")
+        mock_client = MagicMock()
+        mock_client.secrets.kv.v2.list_secrets.side_effect = Exception("500 internal server error")
+
+        with patch.object(store, "_get_client", return_value=mock_client), pytest.raises(
+            SecretStoreError, match="Vault list failed"
+        ):
+            store.list_keys()
+
+    def test_hvac_invalid_path_class_is_missing(self):
+        """hvac.exceptions.InvalidPath (matched by class name) means 'not found'."""
+        from envault.stores import _is_missing_path_error
+
+        class InvalidPath(Exception):
+            pass
+
+        assert _is_missing_path_error(InvalidPath("missing")) is True
+        assert _is_missing_path_error(Exception("connection refused")) is False
 
     def test_vault_auth_fails(self):
         from envault.stores import SecretStoreError, VaultStore
@@ -309,6 +358,32 @@ class TestDopplerStoreDeep:
             )
             result = store.get("MY_KEY")
             assert result == "computed_val"
+
+    def test_get_many_single_request(self):
+        import responses
+
+        from envault.stores import DopplerStore
+
+        store = DopplerStore(project="myapp", config="prd", token="dp-test")
+        url = "https://api.doppler.com/v3/configs/config/secrets"
+
+        with responses.RequestsMock() as rsps:
+            rsps.get(
+                url,
+                json={
+                    "secrets": {
+                        "A": {"raw": "va", "computed": ""},
+                        "B": {"raw": "", "computed": "vb"},
+                        "EMPTY": {"raw": "  ", "computed": "  "},
+                    }
+                },
+            )
+            result = store.get_many(["A", "B", "EMPTY", "MISSING"])
+            assert result == {"A": "va", "B": "vb"}
+
+            # A second batch must reuse the same single mocked response (one request total).
+            assert store.get_many(["A"]) == {"A": "va"}
+            assert len(rsps.calls) == 2  # one per get_many call, not per key
 
     def test_list_keys_with_prefix(self):
         import responses
@@ -464,6 +539,58 @@ class TestOnePasswordStoreDeep:
             )
             keys = store.list_keys(prefix="DB_")
             assert keys == ["DB_HOST", "DB_PORT"]
+
+    def test_get_url_encodes_special_characters_in_key(self):
+        """Keys with special chars (&, =, #, spaces, quotes) must be URL-encoded in the filter."""
+        from urllib.parse import quote
+
+        import responses
+
+        from envault.stores import OnePasswordStore
+
+        store = OnePasswordStore(token="fake", vault_id="v1")
+        base_url = "http://localhost:8080/v1/vaults/v1/items"
+        # Key with characters that break unencoded URLs
+        key = 'MY&KEY=WITH#SPECIAL "CHARS"'
+        encoded_key = quote(key, safe="")
+        filter_url = f"{base_url}?filter=title%20eq%20%22{encoded_key}%22"
+
+        with responses.RequestsMock() as rsps:
+            items = [
+                {
+                    "title": key,
+                    "fields": [{"purpose": "PASSWORD", "value": "secret_val"}],
+                }
+            ]
+            rsps.get(filter_url, json=items)
+            result = store.get(key)
+            assert result == "secret_val"
+            # Verify the request was made with the properly encoded URL
+            assert len(rsps.calls) == 1
+            assert encoded_key in rsps.calls[0].request.url
+
+    def test_delete_url_encodes_special_characters_in_key(self):
+        """delete() must also URL-encode keys with special characters."""
+        from urllib.parse import quote
+
+        import responses
+
+        from envault.stores import OnePasswordStore
+
+        store = OnePasswordStore(token="fake", vault_id="v1")
+        base_url = "http://localhost:8080/v1/vaults/v1/items"
+        key = "KEY/WITH/SLASHES&AMP"
+        encoded_key = quote(key, safe="")
+        filter_url = f"{base_url}?filter=title%20eq%20%22{encoded_key}%22"
+        item_id = "item-del-special"
+
+        with responses.RequestsMock() as rsps:
+            rsps.get(filter_url, json=[{"id": item_id, "title": key}])
+            rsps.delete(f"{base_url}/{item_id}", status=204)
+            result = store.delete(key)
+            assert result is True
+            assert len(rsps.calls) == 2
+            assert encoded_key in rsps.calls[0].request.url
 
 
 # ── Store factory deeper tests ──────────────────────────────────────────────
