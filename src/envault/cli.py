@@ -21,7 +21,7 @@ from envault.config import EnvaultConfig, init_config
 from envault.diff import diff_env_files, format_diff
 from envault.encrypt import decrypt_env, encrypt_env
 from envault.history import format_history, get_env_history
-from envault.rotate import rotate_env_var
+from envault.rotate import rotate_env_file, rotate_env_var
 from envault.security_audit import (
     SecurityAuditResult,
     audit_env_file,
@@ -337,16 +337,12 @@ def rotate_all(
             console.print("Cancelled")
             raise typer.Exit(0)
 
-    rotated = 0
-    for key in sorted(vars.keys()):
-        success, new_val = rotate_env_var(
-            key,
-            env_file,
-            dry_run=dry_run,
-            audit=audit,
-        )
-        if success:
-            rotated += 1
+    new_values = rotate_env_file(
+        env_file,
+        dry_run=dry_run,
+        audit=audit,
+    )
+    rotated = len(new_values)
 
     if dry_run:
         console.print(f"[yellow]Dry run:[/yellow] Would rotate {rotated} variables in {env}")

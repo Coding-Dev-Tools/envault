@@ -675,6 +675,31 @@ class TestRouting:
         assert handler._sent_status == 200
         assert "keys" in handler._sent_json
 
+    def test_auth_info_endpoint_accessible(self):
+        """GET /auth/info should return auth configuration without requiring auth."""
+        store = _FakeStore({})
+        handler = _make_handler(store, api_key="secret-token")
+        handler.path = "/auth/info"
+        handler.do_GET()
+
+        assert handler._sent_status == 200
+        data = handler._sent_json
+        assert "auth_mode" in data
+        assert data["auth_mode"] == "bearer"
+        assert data["requires_auth"] is True
+
+    def test_auth_info_no_auth_configured(self):
+        """GET /auth/info should show 'any' mode when no api_key is set."""
+        store = _FakeStore({})
+        handler = _make_handler(store, api_key=None)
+        handler.path = "/auth/info"
+        handler.do_GET()
+
+        assert handler._sent_status == 200
+        data = handler._sent_json
+        assert data["auth_mode"] == "any"
+        assert data["requires_auth"] is False
+
 
 # ── Tests: API Authentication ──────────────────────────────────────────────────
 
