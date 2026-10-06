@@ -116,25 +116,26 @@ Expose decrypted secrets as an HTTP JSON API — perfect for MCP servers, CI/CD 
 rh-envault serve --port 8080
 
 # Custom host and password
-rh-envault serve --host 0.0.0.0 --port 3000 --password your-master-key
+rh-envault serve --host 0.0.0.0 --port 3000 --password your-master-key --api-token my-token
 ```
 
 Endpoints:
 - `GET /health` — store connectivity check (no auth required)
+- `GET /auth/info` — discover configured authentication methods (no auth required)
 - `GET /secrets` — list all secret keys, optional `?prefix=X` filter (auth required)
 - `GET /secrets/{key}` — get decrypted value for a key (auth required)
 
-Authentication: Bearer token in the `Authorization` header. The token is the SHA-256 hex digest of your encryption key.
+Authentication: set `--api-token` or `ENVAULT_API_TOKEN` for `Authorization: Bearer <token>`, or set `--api-key` or `ENVAULT_API_KEY` for `X-API-Key: <key>`. API credentials are separate from the encryption password. Without credentials, secrets routes are unauthenticated and binding is limited to localhost.
 
 ```bash
 # List all secrets
-curl -H "Authorization: Bearer <sha256-of-encrypt-key>" http://localhost:8080/secrets
+curl -H "Authorization: Bearer my-token" http://localhost:8080/secrets
 
 # Filter by prefix
-curl -H "Authorization: Bearer <sha256-of-encrypt-key>" "http://localhost:8080/secrets?prefix=STRIPE"
+curl -H "Authorization: Bearer my-token" "http://localhost:8080/secrets?prefix=STRIPE"
 
 # Get a specific secret
-curl -H "Authorization: Bearer <sha256-of-encrypt-key>" http://localhost:8080/secrets/DB_PASSWORD
+curl -H "Authorization: Bearer my-token" http://localhost:8080/secrets/DB_PASSWORD
 ```
 
 ### `rh-envault audit`
@@ -156,7 +157,7 @@ Start an HTTP server that exposes decrypted secrets as a JSON API — ideal for 
 rh-envault serve
 
 # Custom port, host, and API key
-rh-envault serve --port 3000 --host 0.0.0.0 --api-key my-bearer-token
+rh-envault serve --port 3000 --host 0.0.0.0 --api-key my-api-key
 
 # Use a named store from config
 rh-envault serve --store production-secrets
@@ -167,23 +168,25 @@ rh-envault serve --store production-secrets
 | Endpoint | Auth | Description |
 |----------|------|-------------|
 | `GET /health` | No | Store connectivity check |
+| `GET /auth/info` | No | Configured authentication methods |
 | `GET /secrets` | Yes | List all secret keys (filter with `?prefix=X`) |
 | `GET /secrets/{key}` | Yes | Get decrypted value for a key |
 
 **Security:**
 - Defaults to `127.0.0.1` (localhost only) — use `--host 0.0.0.0` only behind a firewall or reverse proxy
-- Set `--api-key` or `ENVAULT_API_KEY` env var to require Bearer token auth on `/secrets` endpoints
+- Set `--api-key` or `ENVAULT_API_KEY` for `X-API-Key` authentication, or `--api-token` or `ENVAULT_API_TOKEN` for Bearer authentication on `/secrets` endpoints
+- Without API credentials, secrets endpoints are unauthenticated and binding is limited to localhost
 - No built-in TLS — run behind a reverse proxy (nginx, Caddy) for HTTPS in production
 
 ```bash
 # Fetch secrets with curl
-curl -H "Authorization: Bearer my-token" http://localhost:8080/secrets
+curl -H "X-API-Key: my-api-key" http://localhost:8080/secrets
 
 # Filter by prefix
-curl -H "Authorization: Bearer my-token" "http://localhost:8080/secrets?prefix=STRIPE"
+curl -H "X-API-Key: my-api-key" "http://localhost:8080/secrets?prefix=STRIPE"
 
 # Get a specific secret
-curl -H "Authorization: Bearer my-token" http://localhost:8080/secrets/DB_PASSWORD
+curl -H "X-API-Key: my-api-key" http://localhost:8080/secrets/DB_PASSWORD
 ```
 
 ## Features

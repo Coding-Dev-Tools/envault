@@ -736,7 +736,7 @@ def serve(
         "-k",
         help="Encryption password (prompted if omitted, or use ENVAULT_ENCRYPT_KEY)",
     ),
-    api_key: str | None = typer.Option(None, "--api-key", help="Bearer token for API auth (or set ENVAULT_API_KEY)"),
+    api_key: str | None = typer.Option(None, "--api-key", help="X-API-Key header credential (or set ENVAULT_API_KEY)"),
     store: str | None = typer.Option(None, "--store", "-s", help="Named store from config to use"),
     config_path: str = typer.Option("", "--config", "-c", help="Config file path"),
     api_token: str | None = typer.Option(
@@ -760,7 +760,8 @@ def serve(
 
        Security:
     - Default bind is 127.0.0.1 (localhost only); use --host 0.0.0.0 to expose.
-    - Set --api-key or ENVAULT_API_KEY to require Bearer token auth on /secrets.
+    - Set --api-key or ENVAULT_API_KEY for X-API-Key header authentication.
+    - Set --api-token or ENVAULT_API_TOKEN for Authorization: Bearer authentication.
     """
     config = load_config(config_path)
     run_server(
@@ -770,6 +771,7 @@ def serve(
         encrypt_key=password,
         store_name=store,
         api_key=api_key,
+        api_token=api_token,
     )
 
 

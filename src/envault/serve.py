@@ -7,11 +7,10 @@ Endpoints:
 
 Security:
  - Default bind address is 127.0.0.1 (localhost only).
- - If --api-key is provided, all endpoints (except /health) require
-   an Authorization: Bearer <api-key> header. Requests without a
-   valid token receive 401 Unauthorized.
- - If --api-key is not provided, a warning is printed at startup
-   recommending authentication for production use.
+ - When API credentials are configured, secret endpoints require credentials
+   accepted by the selected auth mode. /health and /auth/info remain public.
+ - Configure authentication using ENVAULT_API_KEY, ENVAULT_API_TOKEN, or an
+   OAuth2 endpoint. Without credentials, binding is limited to localhost.
 """
 
 from __future__ import annotations
@@ -82,6 +81,9 @@ class SecretHandler(BaseHTTPRequestHandler):
             return False
 
         token = auth_header[len("Bearer ") :]
+        if not token:
+            self._send_error(401, "Unauthorized: Bearer token required")
+            return False
 
         # If OAuth2 introspection URL is configured, validate via introspection
         if self.oauth_introspect_url:
@@ -92,7 +94,7 @@ class SecretHandler(BaseHTTPRequestHandler):
             return self._oauth2_userinfo(token)
 
         # Otherwise, fall back to static token check
-        if token != (self.api_token or ""):
+        if not self.api_token or token != self.api_token:
             self._send_error(401, "Unauthorized: invalid Bearer token")
             return False
 
@@ -487,10 +489,20 @@ def run_server(
     store_name : str | None
         Named store from config to use; if *None* the default store is used.
     api_key : str | None
-        Bearer token for API authentication. If provided, all /secrets
-        endpoints require an Authorization: Bearer <api-key> header.
-        If *None*, the ENVAULT_API_KEY env var is checked; if that is also
-        unset, auth is disabled (with a warning).
+        Credential for X-API-Key authentication. If *None*, read ENVAULT_API_KEY.
+        The selected auth mode determines which header is accepted.
+    api_token : str | None
+        Static Bearer token. If *None*, read ENVAULT_API_TOKEN.
+    oauth_introspect_url : str | None
+        OAuth2 introspection endpoint, or read ENVAULT_OAUTH_INTROSPECT_URL.
+    oauth_userinfo_url : str | None
+        OAuth2 userinfo endpoint, or read ENVAULT_OAUTH_USERINFO_URL.
+    oauth_client_id : str | None
+        OAuth2 client ID, or read ENVAULT_OAUTH_CLIENT_ID.
+    oauth_client_secret : str | None
+        OAuth2 client secret, or read ENVAULT_OAUTH_CLIENT_SECRET.
+    auth_mode : str
+        Credential mode: bearer, api-key, oauth2, or any.
     """
 
     # Resolve encryption key (same auth model as decrypt command)
@@ -555,7 +567,18 @@ def run_server(
     else:
         store_instance = get_store("")
 
-    handler_class = create_handler(store_instance, config, encrypt_key, resolved_api_key)
+    handler_class = create_handler(
+        store=store_instance,
+        config=config,
+        encrypt_key=encrypt_key,
+        api_key=resolved_api_key,
+        api_token=api_token,
+        oauth_introspect_url=oauth_introspect_url,
+        oauth_userinfo_url=oauth_userinfo_url,
+        oauth_client_id=oauth_client_id,
+        oauth_client_secret=oauth_client_secret,
+        auth_mode=auth_mode,
+    )
     server = HTTPServer((host, port), handler_class)
 
     from rich.console import Console
@@ -566,8 +589,8 @@ def run_server(
     console.print(" GET /secrets?prefix=X — filter keys by prefix")
     console.print(" GET /secrets/{key} — get decrypted value")
     console.print(" GET /health — store connectivity check")
-    if resolved_api_key:
-        console.print("[green]🔒[/green] API authentication enabled (Bearer token required)")
+    if has_any_auth:
+        console.print("[green]🔒[/green] API authentication enabled")
     else:
         console.print("[yellow]⚠[/yellow] No API key set — secrets endpoints are unauthenticated!")
         console.print("[dim]   Set --api-key flag or ENVAULT_API_KEY env var to enable auth[/dim]")
