@@ -81,6 +81,9 @@ class SecretHandler(BaseHTTPRequestHandler):
             return False
 
         token = auth_header[len("Bearer ") :]
+        if not token:
+            self._send_error(401, "Unauthorized: Bearer token required")
+            return False
 
         # If OAuth2 introspection URL is configured, validate via introspection
         if self.oauth_introspect_url:
@@ -91,7 +94,7 @@ class SecretHandler(BaseHTTPRequestHandler):
             return self._oauth2_userinfo(token)
 
         # Otherwise, fall back to static token check
-        if token != (self.api_token or ""):
+        if not self.api_token or token != self.api_token:
             self._send_error(401, "Unauthorized: invalid Bearer token")
             return False
 
