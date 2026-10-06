@@ -4,6 +4,7 @@ Closes gaps in BearerAuth, ApiKeyAuth, OAuth2Auth (userinfo strategy,
 cache expiry, scope/audience validation, error paths), MultiAuth fallback
 logic, and build_auth_from_env factory.
 """
+
 from __future__ import annotations
 
 import json

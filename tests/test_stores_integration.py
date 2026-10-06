@@ -255,8 +255,9 @@ class TestVaultStore:
         mock_client = MagicMock()
         mock_client.secrets.kv.v2.read_secret.side_effect = Exception("permission denied")
 
-        with patch.object(store, "_get_client", return_value=mock_client), pytest.raises(
-            SecretStoreError, match="Vault read failed"
+        with (
+            patch.object(store, "_get_client", return_value=mock_client),
+            pytest.raises(SecretStoreError, match="Vault read failed"),
         ):
             store.get("MY_KEY")
 
@@ -265,12 +266,11 @@ class TestVaultStore:
 
         store = VaultStore(token="s.test")
         mock_client = MagicMock()
-        mock_client.secrets.kv.v2.delete_metadata_and_all_versions.side_effect = Exception(
-            "connection refused"
-        )
+        mock_client.secrets.kv.v2.delete_metadata_and_all_versions.side_effect = Exception("connection refused")
 
-        with patch.object(store, "_get_client", return_value=mock_client), pytest.raises(
-            SecretStoreError, match="Vault delete failed"
+        with (
+            patch.object(store, "_get_client", return_value=mock_client),
+            pytest.raises(SecretStoreError, match="Vault delete failed"),
         ):
             store.delete("OLD_KEY")
 
@@ -281,8 +281,9 @@ class TestVaultStore:
         mock_client = MagicMock()
         mock_client.secrets.kv.v2.list_secrets.side_effect = Exception("500 internal server error")
 
-        with patch.object(store, "_get_client", return_value=mock_client), pytest.raises(
-            SecretStoreError, match="Vault list failed"
+        with (
+            patch.object(store, "_get_client", return_value=mock_client),
+            pytest.raises(SecretStoreError, match="Vault list failed"),
         ):
             store.list_keys()
 

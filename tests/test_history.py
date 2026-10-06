@@ -29,7 +29,7 @@ def test_parse_env_content_basic():
 
 
 def test_parse_env_content_strips_symmetric_quotes():
-    content = 'A="quoted"\nB=' + "'single'\n" + "C=un\"matched\n"
+    content = 'A="quoted"\nB=' + "'single'\n" + 'C=un"matched\n'
     parsed = _parse_env_content(content)
     assert parsed["A"] == "quoted"
     assert parsed["B"] == "single"
